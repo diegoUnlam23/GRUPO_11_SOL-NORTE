@@ -1,14 +1,41 @@
+/*
+	- Consigna:
+		Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
+		también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
+		Los nombres de los store procedures NO deben comenzar con “SP”.
+		Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
+		transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
+		Asegúrense de que los comentarios que acompañen al código lo expliquen.
+		Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
+		en la creación de objetos. NO use el esquema “dbo”.
+		Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
+		realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
+		en los juegos de prueba demuestren la correcta aplicación de las validaciones.
+	- Fecha de entrega: 17/06/2025
+	- Número de comisión: 2900 
+	- Número de grupo: 11
+	- Nombre de la materia: Bases de Datos Aplicadas
+	- Integrantes:
+		- Costanzo, Marcos Ezequiel - 40955907
+		- Sanchez, Diego Mauricio - 46361081
+*/
+
+-- Creación de Base de Datos
 create database Com2900G11;
 go
 
 use Com2900G11;
 go
 
-create schema empleado; --TABLA Y SP PARA PROFESORES
-create schema general; --TABLAS Y SP QUE USAN TODOS LOS SCHEMAS
-create schema socio; --TABLAS Y SP PARA EL USO DE LOS SOCIOS
+-- Creación de Esquemas
+create schema empleado; --TABLAS Y SP PARA PROFESORES
+create schema general; -- TABLAS Y SP QUE USAN TODOS LOS SCHEMAS
+create schema socio; -- TABLAS Y SP PARA EL USO DE LOS SOCIOS
 go
---- TABLAS SOCIO---
+
+---------------------------------------------------------------------------
+------------------------------ TABLAS SOCIO -------------------------------
+---------------------------------------------------------------------------
 create table socio.datos_obra_social
 (
 	id					int primary key identity(1,1),
@@ -16,7 +43,8 @@ create table socio.datos_obra_social
 	telefono_emergencia	varchar(50) NOT NULL
 );
 
-create table socio.obra_social_usuario
+-- Obra Social Persona
+create table socio.obra_social_persona
 (
 	id 			 int primary key identity(1,1),
 	id_datos_os	 int NOT NULL,
@@ -25,6 +53,7 @@ create table socio.obra_social_usuario
 );
 go
 
+-- Persona
 create table socio.persona
 (
 	id						int primary key identity(1,1),
@@ -36,10 +65,11 @@ create table socio.persona
 	telefono				varchar(20) NOT NULL,
 	telefono_emergencia		varchar(20) NOT NULL,
 	saldo_actual			decimal(8,2) default 0,
-	id_obra_social_usuario	int NOT NULL,
-	foreign key (id_obra_social_usuario) references socio.obra_social_usuario(id)
+	id_obra_social_persona	int NOT NULL,
+	foreign key (id_obra_social_persona) references socio.obra_social_persona(id)
 );
 
+-- Grupo Familiar
 create table socio.grupo_familiar
 (
 	id							int identity(1,1),
@@ -52,17 +82,29 @@ create table socio.grupo_familiar
 	foreign key (id_persona) references socio.persona(id)
 );
 go
---- TABLAS CUENTA ACCESO Y EMPLEADO ---
+---------------------------------------------------------------------------
+---------------------------- FIN TABLAS SOCIO -----------------------------
+---------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------
+-------------------- TABLAS CUENTA ACCESO Y EMPLEADO ----------------------
+---------------------------------------------------------------------------
+-- Rol
 create table general.rol
 (
 	id				int primary key identity(1,1),
 	descripcion		varchar(100) NOT NULL
 );
+
+-- Puesto
 create table empleado.puesto
 (
 	id 			int primary key identity(1,1),
 	descripcion	varchar(100) NOT NULL
 );
+
+-- Empleado
 create table empleado.empleado
 (
 	id			int primary key identity(1,1),
@@ -73,6 +115,8 @@ create table empleado.empleado
 	id_puesto	int NOT NULL,
 	foreign key (id_puesto) references empleado.puesto(id)
 );
+
+-- Cuenta Acceso
 create table general.cuenta_acceso
 (
 	id						int primary key identity(1,1),
@@ -88,7 +132,10 @@ create table general.cuenta_acceso
 );
 go
 
---- TABLAS INV Y PILETA ---
+---------------------------------------------------------------------------
+----------------------- TABLAS INVITADO Y PILETA --------------------------
+---------------------------------------------------------------------------
+-- Invitado
 create table socio.invitado
 (
 	id						int primary key identity(1,1),
@@ -99,6 +146,7 @@ create table socio.invitado
 	foreign key (id_persona_asociada) references socio.persona(id)
 );
 
+-- Tarifa Pileta
 create table socio.tarifa_pileta
 (
 	id		int primary key identity(1,1),
@@ -106,6 +154,7 @@ create table socio.tarifa_pileta
 	precio	decimal(8,2) NOT NULL check(precio >= 0)
 );
 
+-- Registro Pileta
 create table socio.registro_pileta
 (
 	id				int primary key identity(1,1),
@@ -118,7 +167,15 @@ create table socio.registro_pileta
 	foreign key (id_tarifa) references socio.tarifa_pileta(id)
 );
 go
---- TABLAS INSCRIPCION Y CLASE ---
+---------------------------------------------------------------------------
+---------------------- FIN TABLAS INVITADO Y PILETA -----------------------
+---------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------
+----------------------- TABLAS INSCRIPCION Y CLASE ------------------------
+---------------------------------------------------------------------------
+-- Categoria
 create table socio.categoria
 (
 	id			int primary key identity(1,1),
@@ -128,18 +185,21 @@ create table socio.categoria
 	edad_max	int NOT NULL CHECK(edad_max > edad_min)
 );
 
+-- Estado Inscripcion
 create table socio.estado_inscripcion
 (
 	id		int primary key identity(1,1),
 	estado	varchar(50) NOT NULL
 );
 
-
+-- Medio de Pago
 create table socio.medio_de_pago
 (
 	id		int primary key identity(1,1),
 	tipo	varchar(50) NOT NULL
-); 
+);
+
+-- Inscripcion
 create table socio.inscripcion
 (
 	id					varchar(10) primary key CHECK(id like 'SN-_%'),
@@ -157,7 +217,15 @@ create table socio.inscripcion
 	foreign key (id_medio_pago) references socio.medio_de_pago(id)
 );
 go
---- CLASE/ACTIVIDAD ---
+---------------------------------------------------------------------------
+--------------------- FIN TABLAS INSCRIPCION Y CLASE ----------------------
+---------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------
+------------------------ TABLAS CLASE / ACTIVIDAD -------------------------
+---------------------------------------------------------------------------
+-- Actividad
 create table general.actividad
 (
 	id		int primary key identity(1,1),
@@ -165,6 +233,7 @@ create table general.actividad
 	costo	decimal(8,2) NOT NULL
 );
 
+-- Actividad Extra
 create table general.actividad_extra
 (
 	id		int primary key identity(1,1),
@@ -172,11 +241,14 @@ create table general.actividad_extra
 	costo	decimal(8,2) NOT NULL
 );
 
+-- Dia Semana
 create table general.dia_semana
 (
 	id		int primary key identity(1,1),
 	nombre	varchar(50) NOT NULL
 );
+
+-- Inscripcion Actividad
 create table socio.inscripcion_actividad
 (
 	id					int primary key identity(1,1),
@@ -188,6 +260,8 @@ create table socio.inscripcion_actividad
 	foreign key (id_actividad) references general.actividad(id),
 	foreign key (id_actividad_extra) references general.actividad_extra(id)
 );
+
+-- Clase
 create table general.clase
 (
 	id				int primary key identity(1,1),
@@ -203,7 +277,15 @@ create table general.clase
 	foreign key (id_dia_semana) references general.dia_semana(id)
 );
 go
---- TABLA PAGO Y FACTURA ---
+---------------------------------------------------------------------------
+---------------------- FIN TABLAS CLASE / ACTIVIDAD -----------------------
+---------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------
+------------------------- TABLAS PAGO Y FACTURA ---------------------------
+---------------------------------------------------------------------------
+-- Cuenta Corriente
 create table socio.cuenta_corriente
 (
 	id			int primary key identity(1,1),
@@ -211,11 +293,15 @@ create table socio.cuenta_corriente
 	saldo		decimal(8,2),
 	foreign key (id_persona) references socio.persona(id)
 );
+
+-- Estado Factura
 create table socio.estado_factura 
 (
 	id				int primary key identity(1,1),
 	descripcion		varchar(50) NOT NULL
 );
+
+-- Factura
 create table socio.factura
 (
 	id						int primary key identity(1,1),
@@ -232,6 +318,7 @@ create table socio.factura
 	foreign key (id_estado_factura) references socio.estado_factura(id)
 );
 
+-- Item Factura
 create table socio.item_factura
 (
 	id			int primary key identity(1,1),
@@ -240,7 +327,8 @@ create table socio.item_factura
 	tipo_item	varchar(50) NOT NULL,
 	foreign key (id_factura) references socio.factura(id)
 );
-go
+
+-- Pago
 create table socio.pago
 (
 	id						int primary key identity (1,1),
@@ -250,11 +338,15 @@ create table socio.pago
 	id_factura				int NOT NULL,
 	foreign key (id_factura) references socio.factura(id)
 );
+
+-- Tipo Reembolso
 create table socio.tipo_reembolso
 (
 	id				int primary key identity (1,1),
 	descripcion		varchar(50) NOT NULL
 );
+
+-- Reembolso
 create table socio.reembolso
 (
 	id					int primary key identity (1,1),
@@ -266,6 +358,8 @@ create table socio.reembolso
 	foreign key (id_pago) references socio.pago(id),
 	foreign key (id_tipo_reembolso) references socio.tipo_reembolso(id)
 );
+
+-- Movimiento Cuenta
 create table socio.movimiento_cuenta
 (
 	id						int primary key identity (1,1),
@@ -281,6 +375,10 @@ create table socio.movimiento_cuenta
 	foreign key (id_reembolso) references socio.reembolso(id)
 );
 go
+---------------------------------------------------------------------------
+----------------------- FIN TABLAS PAGO Y FACTURA -------------------------
+---------------------------------------------------------------------------
+
 
 --------------------------- CREACION DE SOCIO-----------------------------------------
 
@@ -323,13 +421,13 @@ begin
 	if(@nombre in(select datos_obra_social.nombre from socio.datos_obra_social))
 	begin	
 		set @id_os = (select datos_obra_social.id from socio.datos_obra_social where @nombre = nombre)
-		insert into socio.obra_social_usuario(id_datos_os,numero_socio) values (@id_os,@numero_socio)
+		insert into socio.obra_social_persona(id_datos_os,numero_socio) values (@id_os,@numero_socio)
 	end
 	else
 	begin
 		exec socio.agregarObSocial @nombre,@telefono_emergencia,@id_os
 		--set @id_os = (select datos_obra_social.id from socio.datos_obra_social where @nombre = nombre)
-		insert into socio.obra_social_usuario(id_datos_os,numero_socio) values (@id_os,@numero_socio)
+		insert into socio.obra_social_persona(id_datos_os,numero_socio) values (@id_os,@numero_socio)
 	end
 		
 end
@@ -344,7 +442,7 @@ create or alter procedure socio.cargarPersona
 	@f_nac		date,
 	@tel		varchar(20),
 	@telefono_emergencia		varchar(20),
-	--@saldo		decimal(8,2),
+	-- @saldo		decimal(8,2),
 	@num_OS		varchar(20),
 	@nomOS		varchar(50),
 	@telOS		varchar(50)
@@ -360,8 +458,8 @@ begin
 	if(@dni not in(select persona.dni from socio.persona))
 	begin
 		exec socio.cargarSocioOS @nomOS,@num_OS,@telOS
-		set @id_os = (select obra_social_usuario.id from socio.obra_social_usuario where @num_OS = obra_social_usuario.numero_socio)
-		insert into socio.persona(nombre,apellido,dni,email,fecha_nacimiento,telefono,telefono_emergencia,saldo_actual,id_obra_social_usuario) 
+		set @id_os = (select obra_social_persona.id from socio.obra_social_persona where @num_OS = obra_social_persona.numero_socio)
+		insert into socio.persona(nombre,apellido,dni,email,fecha_nacimiento,telefono,telefono_emergencia,saldo_actual,id_obra_social_persona) 
 		values (@nombre,@apellido,@dni,@email,@f_nac,@tel,@telefono_emergencia,0,@id_os)
 	end
 end
@@ -399,9 +497,9 @@ begin
 		edad_max = @max
 	where @nombre = nombre
 end
--- ESTADO DEL SOCIO
+-- ESTADO INSCRIPCION
 
-create or alter procedure socio.agregarEstadoSocio
+create or alter procedure socio.agregarEstadoInscripcion
 	@descripcion varchar(100),
 	@id_est int output
 as
