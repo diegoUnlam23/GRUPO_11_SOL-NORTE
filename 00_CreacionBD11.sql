@@ -28,8 +28,10 @@ use Com2900G11;
 go
 
 -- Creación de Esquemas
-create schema empleado; --TABLAS Y SP PARA PROFESORES
+create schema empleado;--TABLAS Y SP PARA PROFESORES
+go
 create schema general; -- TABLAS Y SP QUE USAN TODOS LOS SCHEMAS
+go
 create schema socio; -- TABLAS Y SP PARA EL USO DE LOS SOCIOS
 go
 
@@ -60,10 +62,10 @@ create table socio.persona
 	nombre					varchar(50) NOT NULL,
 	apellido				varchar(50) NOT NULL,
 	dni						int UNIQUE NOT NULL CHECK(dni > 0),
-	email					varchar(254) NOT NULL CHECK(email like '_%@_%._%'),
+	email					varchar(254) CHECK(email like '_%@_%._%'),
 	fecha_nacimiento		date NOT NULL,
-	telefono				varchar(20) NOT NULL,
-	telefono_emergencia		varchar(20) NOT NULL,
+	telefono				varchar(20) ,
+	telefono_emergencia		varchar(20) ,
 	saldo_actual			decimal(8,2) default 0,
 	id_obra_social_persona	int,
 	foreign key (id_obra_social_persona) references socio.obra_social_persona(id)
@@ -180,7 +182,7 @@ create table socio.categoria
 	nombre		varchar(10) NOT NULL,
 	costo		decimal(8,2) NOT NULL CHECK(costo > 0),
 	edad_min	int NOT NULL,
-	edad_max	int NOT NULL CHECK(edad_max > edad_min)
+	edad_max	int NOT NULL 
 );
 
 -- Estado Inscripcion
@@ -200,7 +202,7 @@ create table socio.medio_de_pago
 -- Inscripcion
 create table socio.inscripcion
 (
-	id					int,
+	id					int primary key identity(1,1),
 	numero_socio		varchar(10) CHECK(id like 'SN-_%'),
 	id_persona			int NOT NULL,
 	id_grupo_familiar	int,
@@ -251,7 +253,7 @@ create table general.dia_semana
 create table socio.inscripcion_actividad
 (
 	id					int primary key identity(1,1),
-	id_inscripcion		varchar(10) NOT NULL,
+	id_inscripcion		int NOT NULL,
 	id_actividad		int NOT NULL,
 	id_actividad_extra	int NOT NULL,
 	fecha_inscripcion	datetime NOT NULL,
@@ -265,7 +267,7 @@ create table general.clase
 (
 	id				int primary key identity(1,1),
 	hora_inicio		time NOT NULL,
-	hora_fin		time NOT NULL CHECK(hora_fin>hora_inicio),
+	hora_fin		time NOT NULL,
 	id_categoria	int NOT NULL,
 	id_actividad	int NOT NULL,
 	id_dia_semana	int NOT NULL,
@@ -410,7 +412,7 @@ begin
     insert into socio.datos_obra_social (nombre, telefono_emergencia)
     values (@nombre, @telefono_emergencia);
 end
-
+go
 -- UPDATE
 create or alter procedure socio.actualizarDatosObraSocial
     @id int,
@@ -444,7 +446,7 @@ begin
         telefono_emergencia = @nuevo_telefono_emergencia
     where id = @id;
 end
-
+go
 -- DELETE
 create or alter procedure socio.eliminarDatosObraSocial
     @id int
@@ -467,6 +469,7 @@ begin
     -- Eliminar la obra social
     delete from socio.datos_obra_social where id = @id;
 end
+go
 /*************************************************************************/
 /************************* FIN DATOS OBRA SOCIAL *************************/
 /*************************************************************************/
@@ -497,7 +500,7 @@ begin
     insert into socio.obra_social_persona (id_datos_os, numero_socio)
     values (@id_datos_os, @numero_socio);
 end
-
+go
 -- UPDATE
 create or alter procedure socio.actualizarObraSocialPersona
     @id int,
@@ -531,7 +534,7 @@ begin
         numero_socio = @nuevo_numero_socio
     where id = @id;
 end
-
+go
 -- DELETE
 create or alter procedure socio.eliminarObraSocialPersona
     @id int
@@ -554,6 +557,7 @@ begin
     -- Eliminar la obra social de la persona
     delete from socio.obra_social_persona where id = @id;
 end
+go
 /*************************************************************************/
 /************************ FIN OBRA SOCIAL PERSONA ************************/
 /*************************************************************************/
@@ -2061,7 +2065,7 @@ begin
     set nocount on;
 
 	declare @id_cuenta_corriente int;
-
+	declare @id_reembolso int;
     -- Validar que exista el pago asociado
     if not exists (select 1 from socio.pago where id = @id_pago)
     begin
@@ -2103,7 +2107,8 @@ begin
 		-- Insertar el reembolso
 		insert into socio.reembolso (id_pago, monto, fecha_reembolso, motivo, id_tipo_reembolso)
 		values (@id_pago, @monto, @fecha_reembolso, @motivo, @id_tipo_reembolso);
-
+		
+		set @id_reembolso = scope_identity();
 		-- Obtener cuenta corriente
 		select @id_cuenta_corriente = cc.id
 		from socio.reembolso r
@@ -3170,7 +3175,7 @@ begin
     end
 
     -- Insertar el nuevo puesto
-    insert into empleado.puesto (nombre)
+    insert into empleado.puesto (descripcion)
     values (@nombre);
 
     print 'Puesto agregado correctamente.';
@@ -3208,7 +3213,7 @@ begin
 
     -- Actualizar el puesto
     update empleado.puesto
-    set nombre = @nombre
+    set descripcion = @nombre
     where id = @id;
 
     print 'Puesto actualizado correctamente.';
