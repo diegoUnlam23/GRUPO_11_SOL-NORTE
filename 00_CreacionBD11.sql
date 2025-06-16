@@ -122,8 +122,8 @@ create table general.cuenta_acceso
 	hash_contraseña			varchar(50) NOT NULL,
 	vigencia_contraseña		date NOT NULL,
 	id_rol					int NOT NULL,
-	id_persona				int NOT NULL,
-	id_empleado				int NOT NULL,
+	id_persona				int,
+	id_empleado				int,
 	foreign key (id_rol) references general.rol(id),
 	foreign key (id_persona) references socio.persona(id),
 	foreign key (id_empleado) references empleado.empleado(id)
@@ -631,13 +631,13 @@ begin
     if not exists (select 1 from socio.persona where id = @id)
     begin
         print 'No existe una persona con el ID especificado.'
-        return
+        return;
     end
 
     if(@email not like '_%@_%._%')
     begin
         print 'El email no tiene un formato válido.'
-        return
+        return;
     end
 
     update socio.persona
@@ -673,14 +673,14 @@ begin
     if not exists (select 1 from socio.persona where id = @id_persona)
     begin
         print 'No existe una persona con el ID especificado.'
-        return
+        return;
     end
 
     -- Validar relación no vacía
     if @relacion_con_responsable = ''
     begin
         print 'La relación con el responsable no puede ser vacía.'
-        return
+        return;
     end
 
     insert into socio.grupo_familiar (id_persona, es_responsable, relacion_con_responsable)
@@ -701,19 +701,19 @@ begin
     if not exists (select 1 from socio.grupo_familiar where id = @id)
     begin
         print 'No existe un miembro del grupo familiar con el ID especificado.'
-        return
+        return;
     end
 
     if not exists (select 1 from socio.persona where id = @id_persona)
     begin
         print 'No existe una persona con el ID especificado.'
-        return
+        return;
     end
 
     if @relacion_con_responsable = ''
     begin
         print 'La relación con el responsable no puede ser vacía.'
-        return
+        return;
     end
 
     update socio.grupo_familiar
@@ -734,7 +734,7 @@ begin
     if not exists (select 1 from socio.grupo_familiar where id = @id)
     begin
         print 'No existe un miembro del grupo familiar con el ID especificado.'
-        return
+        return;
     end
 
     delete from socio.grupo_familiar where id = @id
@@ -761,21 +761,21 @@ begin
     if not exists (select 1 from socio.persona where id = @id_persona_asociada)
     begin
         print 'No existe una persona asociada con ese ID.'
-        return
+        return;
     end
 
     -- Validar dni positivo
     if @dni <= 0
     begin
         print 'El DNI debe ser mayor a cero.'
-        return
+        return;
     end
 
     -- Validar que el DNI no esté repetido
     if exists (select 1 from socio.invitado where dni = @dni)
     begin
         print 'Ya existe un invitado con ese DNI.'
-        return
+        return;
     end
 
     insert into socio.invitado (nombre, apellido, dni, id_persona_asociada)
@@ -798,28 +798,28 @@ begin
     if not exists (select 1 from socio.invitado where id = @id)
     begin
         print 'No existe un invitado con ese ID.'
-        return
+        return;
     end
 
     -- Validar que la persona asociada exista
     if not exists (select 1 from socio.persona where id = @id_persona_asociada)
     begin
         print 'No existe una persona asociada con ese ID.'
-        return
+        return;
     end
 
     -- Validar dni positivo
     if @dni <= 0
     begin
         print 'El DNI debe ser mayor a cero.'
-        return
+        return;
     end
 
     -- Validar que no haya otro invitado con el mismo DNI (excepto este)
     if exists (select 1 from socio.invitado where dni = @dni and id <> @id)
     begin
         print 'Ya existe otro invitado con ese DNI.'
-        return
+        return;
     end
 
     update socio.invitado
@@ -852,14 +852,14 @@ begin
     if @tipo not in ('Socio', 'Invitado')
     begin
         print 'El tipo debe ser "Socio" o "Invitado".'
-        return
+        return;
     end
 
     -- Validar precio no negativo
     if @precio < 0
     begin
         print 'El precio no puede ser negativo.'
-        return
+        return;
     end
 
     insert into socio.tarifa_pileta (tipo, precio)
@@ -880,21 +880,21 @@ begin
     if not exists (select 1 from socio.tarifa_pileta where id = @id)
     begin
         print 'No existe una tarifa con ese ID.'
-        return
+        return;
     end
 
     -- Validar tipo
     if @tipo not in ('Socio', 'Invitado')
     begin
         print 'El tipo debe ser "Socio" o "Invitado".'
-        return
+        return;
     end
 
     -- Validar precio
     if @precio < 0
     begin
         print 'El precio no puede ser negativo.'
-        return
+        return;
     end
 
     update socio.tarifa_pileta
@@ -915,14 +915,14 @@ begin
     if not exists (select 1 from socio.tarifa_pileta where id = @id)
     begin
         print 'No existe una tarifa con ese ID.'
-        return
+        return;
     end
 
     -- Validar que no haya registros en registro_pileta para esta tarifa
     if exists (select 1 from socio.registro_pileta where id_tarifa = @id)
     begin
         print 'No se puede eliminar la tarifa porque está asociada a registros de la pileta.'
-        return
+        return;
     end
 
     delete from socio.tarifa_pileta where id = @id
@@ -949,13 +949,13 @@ begin
     if (@id_persona is null and @id_invitado is null)
     begin
         print 'Debe proporcionar id_persona o id_invitado.'
-        return
+        return;
     end
 
     if (@id_persona is not null and @id_invitado is not null)
     begin
         print 'No puede proporcionar ambos id_persona y id_invitado a la vez.'
-        return
+        return;
     end
 
     -- Validar persona si está presente
@@ -964,7 +964,7 @@ begin
         if not exists (select 1 from socio.persona where id = @id_persona)
         begin
             print 'No existe persona con ese ID.'
-            return
+            return;
         end
     end
 
@@ -974,7 +974,7 @@ begin
         if not exists (select 1 from socio.invitado where id = @id_invitado)
         begin
             print 'No existe invitado con ese ID.'
-            return
+            return;
         end
     end
 
@@ -982,7 +982,7 @@ begin
     if not exists (select 1 from socio.tarifa_pileta where id = @id_tarifa)
     begin
         print 'No existe tarifa pileta con ese ID.'
-        return
+        return;
     end
 
     insert into socio.registro_pileta (id_persona, id_invitado, fecha, id_tarifa)
@@ -1005,20 +1005,20 @@ begin
     if not exists (select 1 from socio.registro_pileta where id = @id)
     begin
         print 'No existe un registro de pileta con ese ID.'
-        return
+        return;
     end
 
     -- Validar que exactamente uno entre persona e invitado esté presente
     if (@id_persona is null and @id_invitado is null)
     begin
         print 'Debe proporcionar id_persona o id_invitado.'
-        return
+        return;
     end
 
     if (@id_persona is not null and @id_invitado is not null)
     begin
         print 'No puede proporcionar ambos id_persona y id_invitado a la vez.'
-        return
+        return;
     end
 
     -- Validar persona si está presente
@@ -1027,7 +1027,7 @@ begin
         if not exists (select 1 from socio.persona where id = @id_persona)
         begin
             print 'No existe persona con ese ID.'
-            return
+            return;
         end
     end
 
@@ -1037,7 +1037,7 @@ begin
         if not exists (select 1 from socio.invitado where id = @id_invitado)
         begin
             print 'No existe invitado con ese ID.'
-            return
+            return;
         end
     end
 
@@ -1045,7 +1045,7 @@ begin
     if not exists (select 1 from socio.tarifa_pileta where id = @id_tarifa)
     begin
         print 'No existe tarifa pileta con ese ID.'
-        return
+        return;
     end
 
     -- Realizar actualización
@@ -1070,7 +1070,7 @@ go
 /*************************** INICIO CATEGORIA ****************************/
 /*************************************************************************/
 -- INSERT
-create procedure socio.insertarCategoria
+create or alter procedure socio.insertarCategoria
     @nombre varchar(10),
     @costo decimal(8,2),
     @edad_min int,
@@ -1100,7 +1100,7 @@ end
 go
 
 -- UPDATE
-create procedure socio.actualizarCategoria
+create or alter procedure socio.actualizarCategoria
     @id_categoria int,
     @nombre varchar(10),
     @costo decimal(8,2),
@@ -1142,7 +1142,7 @@ end
 go
 
 -- DELETE
-create procedure socio.eliminarCategoria
+create or alter procedure socio.eliminarCategoria
     @id_categoria int
 as
 begin
@@ -1176,14 +1176,14 @@ begin
     if @estado is null or ltrim(rtrim(@estado)) = ''
     begin
         print 'El nombre del estado no puede estar vacío.'
-        return
+        return;
     end
 
     -- Validar que no exista un estado igual (case insensitive)
     if exists (select 1 from socio.estado_inscripcion where lower(estado) = lower(@estado))
     begin
         print 'Ya existe un estado con ese nombre.'
-        return
+        return;
     end
 
     insert into socio.estado_inscripcion (estado)
@@ -1203,21 +1203,21 @@ begin
     if not exists (select 1 from socio.estado_inscripcion where id = @id)
     begin
         print 'No existe un estado de inscripción con ese ID.'
-        return
+        return;
     end
 
     -- Validar que el nuevo nombre no esté vacío
     if @estado is null or ltrim(rtrim(@estado)) = ''
     begin
         print 'El nombre del estado no puede estar vacío.'
-        return
+        return;
     end
 
     -- Validar que no exista otro estado con el mismo nombre (case insensitive)
     if exists (select 1 from socio.estado_inscripcion where lower(estado) = lower(@estado) and id <> @id)
     begin
         print 'Ya existe otro estado con ese nombre.'
-        return
+        return;
     end
 
     update socio.estado_inscripcion
@@ -1237,14 +1237,14 @@ begin
     if not exists (select 1 from socio.estado_inscripcion where id = @id)
     begin
         print 'No existe un estado de inscripción con ese ID.'
-        return
+        return;
     end
 
     -- Validar que no haya inscripciones asociadas a este estado
     if exists (select 1 from socio.inscripcion where id_estado = @id)
     begin
         print 'No se puede eliminar el estado porque está asociado a inscripciones.'
-        return
+        return;
     end
 
     -- Eliminar el estado de inscripción
@@ -1269,14 +1269,14 @@ begin
     if @tipo is null or ltrim(rtrim(@tipo)) = ''
     begin
         print 'El tipo de medio de pago no puede estar vacío.'
-        return
+        return;
     end
 
     -- Validar que no exista un medio de pago con el mismo tipo (único)
     if exists (select 1 from socio.medio_de_pago where tipo = @tipo)
     begin
         print 'Ya existe un medio de pago con ese tipo.'
-        return
+        return;
     end
 
     insert into socio.medio_de_pago (tipo)
@@ -1296,21 +1296,21 @@ begin
     if not exists (select 1 from socio.medio_de_pago where id = @id)
     begin
         print 'No existe un medio de pago con ese ID.'
-        return
+        return;
     end
 
     -- Validar que el tipo no esté vacío
     if @tipo is null or ltrim(rtrim(@tipo)) = ''
     begin
         print 'El tipo de medio de pago no puede estar vacío.'
-        return
+        return;
     end
 
     -- Validar que no haya otro medio de pago con el mismo tipo
     if exists (select 1 from socio.medio_de_pago where tipo = @tipo and id <> @id)
     begin
         print 'Ya existe otro medio de pago con ese tipo.'
-        return
+        return;
     end
 
     update socio.medio_de_pago
@@ -1330,14 +1330,14 @@ begin
     if not exists (select 1 from socio.medio_de_pago where id = @id)
     begin
         print 'No existe un medio de pago con ese ID.'
-        return
+        return;
     end
 
     -- Validar que no haya inscripciones usando este medio de pago
     if exists (select 1 from socio.inscripcion where id_medio_pago = @id)
     begin
         print 'No se puede eliminar el medio de pago porque está asociado a inscripciones.'
-        return
+        return;
     end
 
     delete from socio.medio_de_pago where id = @id
@@ -1368,21 +1368,21 @@ begin
     if @numero_socio is null or @numero_socio not like 'SN-%'
     begin
         print 'El número de socio debe comenzar con "SN-".'
-        return
+        return;
     end
 
     -- Validar que no exista una inscripción con el mismo número de socio
     if exists (select 1 from socio.inscripcion where numero_socio = @numero_socio)
     begin
         print 'Ya existe una inscripción con ese número de socio.'
-        return
+        return;
     end
 
     -- Validar que la persona exista
     if not exists (select 1 from socio.persona where id = @id_persona)
     begin
         print 'No existe la persona indicada.'
-        return
+        return;
     end
 
     -- Validar que si se recibe id_grupo_familiar, exista la relación con id_persona
@@ -1391,7 +1391,7 @@ begin
         if not exists (select 1 from socio.grupo_familiar where id = @id_grupo_familiar and id_persona = @id_persona)
         begin
             print 'No existe el grupo familiar para esa persona.'
-            return
+            return;
         end
     end
 
@@ -1399,28 +1399,28 @@ begin
     if not exists (select 1 from socio.estado_inscripcion where id = @id_estado)
     begin
         print 'No existe el estado de inscripción indicado.'
-        return
+        return;
     end
 
     -- Validar que la categoría exista
     if not exists (select 1 from socio.categoria where id = @id_categoria)
     begin
         print 'No existe la categoría indicada.'
-        return
+        return;
     end
 
     -- Validar que el medio de pago exista
     if not exists (select 1 from socio.medio_de_pago where id = @id_medio_pago)
     begin
         print 'No existe el medio de pago indicado.'
-        return
+        return;
     end
 
     -- Validar que fecha_baja sea mayor o igual a fecha_inicio si no es NULL
     if @fecha_baja is not null and @fecha_baja < @fecha_inicio
     begin
         print 'La fecha de baja no puede ser anterior a la fecha de inicio.'
-        return
+        return;
     end
 
     -- Insertar inscripción
@@ -1448,28 +1448,28 @@ begin
     if not exists (select 1 from socio.inscripcion where id = @id)
     begin
         print 'No existe una inscripción con ese ID.'
-        return
+        return;
     end
 
     -- Validar que la categoría exista
     if not exists (select 1 from socio.categoria where id = @id_categoria)
     begin
         print 'No existe la categoría indicada.'
-        return
+        return;
     end
 
     -- Validar que el estado exista
     if not exists (select 1 from socio.estado_inscripcion where id = @id_estado)
     begin
         print 'No existe el estado de inscripción indicado.'
-        return
+        return;
     end
 
     -- Validar que el medio de pago exista
     if not exists (select 1 from socio.medio_de_pago where id = @id_medio_pago)
     begin
         print 'No existe el medio de pago indicado.'
-        return
+        return;
     end
 
     -- Validar que grupo familiar exista si se provee
@@ -1478,7 +1478,7 @@ begin
         if not exists (select 1 from socio.grupo_familiar where id = @id_grupo_familiar)
         begin
             print 'No existe el grupo familiar indicado.'
-            return
+            return;
         end
     end
 
@@ -1486,7 +1486,7 @@ begin
     if @fecha_baja is not null and @fecha_baja < @fecha_inicio
     begin
         print 'La fecha de baja no puede ser anterior a la fecha de inicio.'
-        return
+        return;
     end
 
     -- Actualizar campos permitidos
@@ -1525,28 +1525,28 @@ begin
     if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
     begin
         print 'No existe una inscripción con ese ID.'
-        return
+        return;
     end
 
     -- Validar que al menos una actividad o actividad extra esté presente
     if @id_actividad is null and @id_actividad_extra is null
     begin
         print 'Debe ingresar al menos una actividad o una actividad extra.'
-        return
+        return;
     end
 
     -- Si viene actividad, validar que exista
     if @id_actividad is not null and not exists (select 1 from general.actividad where id = @id_actividad)
     begin
         print 'No existe una actividad con ese ID.'
-        return
+        return;
     end
 
     -- Si viene actividad extra, validar que exista
     if @id_actividad_extra is not null and not exists (select 1 from general.actividad_extra where id = @id_actividad_extra)
     begin
         print 'No existe una actividad extra con ese ID.'
-        return
+        return;
     end
 
     insert into socio.inscripcion_actividad (id_inscripcion, id_actividad, id_actividad_extra, fecha_inscripcion)
@@ -1569,35 +1569,35 @@ begin
     if not exists (select 1 from socio.inscripcion_actividad where id = @id)
     begin
         print 'No existe una inscripción a actividad con ese ID.'
-        return
+        return;
     end
 
     -- Validar que exista la inscripción
     if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
     begin
         print 'No existe una inscripción con ese ID.'
-        return
+        return;
     end
 
     -- Validar que al menos una actividad o actividad extra esté presente
     if @id_actividad is null and @id_actividad_extra is null
     begin
         print 'Debe ingresar al menos una actividad o una actividad extra.'
-        return
+        return;
     end
 
     -- Si viene actividad, validar que exista
     if @id_actividad is not null and not exists (select 1 from general.actividad where id = @id_actividad)
     begin
         print 'No existe una actividad con ese ID.'
-        return
+        return;
     end
 
     -- Si viene actividad extra, validar que exista
     if @id_actividad_extra is not null and not exists (select 1 from general.actividad_extra where id = @id_actividad_extra)
     begin
         print 'No existe una actividad extra con ese ID.'
-        return
+        return;
     end
 
     update socio.inscripcion_actividad
@@ -1620,7 +1620,7 @@ begin
     if not exists (select 1 from socio.inscripcion_actividad where id = @id)
     begin
         print 'No existe una inscripción a actividad con ese ID.'
-        return
+        return;
     end
 
     delete from socio.inscripcion_actividad where id = @id
@@ -1645,14 +1645,14 @@ begin
     if not exists (select 1 from socio.persona where id = @id_persona)
     begin
         print 'No existe la persona indicada.'
-        return
+        return;
     end
 
     -- Validar que la persona no tenga ya una cuenta corriente (asumiendo relación 1 a 1)
     if exists (select 1 from socio.cuenta_corriente where id_persona = @id_persona)
     begin
         print 'La persona ya tiene una cuenta corriente asociada.'
-        return
+        return;
     end
 
     -- Insertar cuenta corriente
@@ -1673,7 +1673,7 @@ begin
     if not exists (select 1 from socio.cuenta_corriente where id = @id)
     begin
         print 'No existe una cuenta corriente con ese ID.'
-        return
+        return;
     end
 
     -- Actualizar saldo
@@ -1703,7 +1703,7 @@ begin
     if exists (select 1 from socio.estado_factura where descripcion = @descripcion)
     begin
         print 'Ya existe un estado de factura con esa descripción.'
-        return
+        return;
     end
 
     insert into socio.estado_factura (descripcion)
@@ -1723,14 +1723,14 @@ begin
     if not exists (select 1 from socio.estado_factura where id = @id)
     begin
         print 'No existe un estado de factura con ese ID.'
-        return
+        return;
     end
 
     -- Validar que la nueva descripción no esté duplicada
     if exists (select 1 from socio.estado_factura where descripcion = @descripcion and id <> @id)
     begin
         print 'Ya existe otro estado de factura con esa descripción.'
-        return
+        return;
     end
 
     update socio.estado_factura
@@ -1750,14 +1750,14 @@ begin
     if not exists (select 1 from socio.estado_factura where id = @id)
     begin
         print 'No existe un estado de factura con ese ID.'
-        return
+        return;
     end
 
     -- Validar que no esté siendo usado en facturas
     if exists (select 1 from socio.factura where id_estado_factura = @id)
     begin
         print 'No se puede eliminar el estado porque está siendo utilizado en alguna factura.'
-        return
+        return;
     end
 
     delete from socio.estado_factura
@@ -1788,14 +1788,14 @@ begin
     if @id_inscripcion is null and @id_registro_pileta is null
     begin
         print 'La factura debe estar asociada a una inscripción, un registro de pileta, o ambos.'
-        return
+        return;
     end
 
     -- Validar que el estado exista
     if not exists (select 1 from socio.estado_factura where id = @id_estado_factura)
     begin
         print 'No existe el estado de factura indicado.'
-        return
+        return;
     end
 
     -- Si se proporciona id_inscripcion, validar que exista
@@ -1804,7 +1804,7 @@ begin
         if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
         begin
             print 'No existe la inscripción indicada.'
-            return
+            return;
         end
     end
     -- Si se proporciona id_registro_pileta, validar que exista
@@ -1813,7 +1813,7 @@ begin
         if not exists (select 1 from socio.registro_pileta where id = @id_registro_pileta)
         begin
             print 'No existe el registro de pileta indicado.'
-            return
+            return;
         end
     end
 
@@ -1821,13 +1821,13 @@ begin
     if @fecha_vencimiento_1 < @fecha_generacion
     begin
         print 'La primera fecha de vencimiento no puede ser anterior a la fecha de generación.'
-        return
+        return;
     end
 
     if @fecha_vencimiento_2 < @fecha_vencimiento_1
     begin
         print 'La segunda fecha de vencimiento no puede ser anterior a la primera fecha de vencimiento.'
-        return
+        return;
     end
 
     -- Insertar la factura
@@ -1867,7 +1867,7 @@ begin
     if not exists (select 1 from socio.factura where id = @id_factura)
     begin
         print 'No existe la factura indicada.'
-        return
+        return;
     end
 
     -- Obtener inscripcion y registro_pileta asociados
@@ -2336,7 +2336,7 @@ go
 /************************ INICIO TIPO REEMBOLSO **************************/
 /*************************************************************************/
 -- INSERT
-create procedure socio.agregarTipoReembolso
+create or alter procedure socio.agregarTipoReembolso
     @descripcion varchar(50)
 as
 begin
@@ -2346,7 +2346,7 @@ begin
     if @descripcion is null or ltrim(rtrim(@descripcion)) = ''
     begin
         print 'La descripcion no puede estar vacía.';
-        return 1;
+        return;
     end
 
     insert into socio.tipo_reembolso (descripcion)
@@ -2357,7 +2357,7 @@ end;
 go
 
 -- UPDATE
-create procedure socio.actualizarTipoReembolso
+create or alter procedure socio.actualizarTipoReembolso
     @id int,
     @descripcion varchar(50)
 as
@@ -2368,21 +2368,21 @@ begin
     if @id <= 0
     begin
         print 'El id debe ser mayor a cero.';
-        return 1;
+        return;
     end
 
     -- La descripción no puede ser nula ni vacía
     if @descripcion is null or ltrim(rtrim(@descripcion)) = ''
     begin
         print 'La descripcion no puede estar vacía.';
-        return 1;
+        return;
     end
 
     -- Verificar que el id exista
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
         print 'Tipo de reembolso no encontrado.';
-        return 1;
+        return;
     end
 
     update socio.tipo_reembolso
@@ -2394,7 +2394,7 @@ end;
 go
 
 -- DELETE
-create procedure socio.eliminarTipoReembolso
+create or alter procedure socio.eliminarTipoReembolso
     @id int
 as
 begin
@@ -2404,21 +2404,21 @@ begin
     if @id <= 0
     begin
         print 'El id debe ser mayor a cero.';
-        return 1;
+        return;
     end
 
     -- Verificar que el id exista
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
         print 'Tipo de reembolso no encontrado.';
-        return 1;
+        return;
     end
 
     -- Verificar que no existan reembolsos asociados
     if exists (select 1 from socio.reembolso where id_tipo_reembolso = @id)
     begin
         print 'No se puede eliminar porque existen reembolsos asociados.';
-        return 1;
+        return;
     end
 
     delete from socio.tipo_reembolso
@@ -2430,12 +2430,6 @@ go
 /*************************************************************************/
 /************************** FIN TIPO REEMBOLSO ***************************/
 /*************************************************************************/
-
-
-
-
-
-
 
 /*************************************************************************/
 /********************** INICIO MOVIMIENTO CUENTA *************************/
@@ -2455,14 +2449,14 @@ begin
     if not exists (select 1 from socio.cuenta_corriente where id = @id_cuenta_corriente)
     begin
         print 'No existe la cuenta corriente indicada.'
-        return
+        return;
     end
 
     -- Validar que al menos uno sea informado
     if @id_factura is null and @id_pago is null and @id_reembolso is null
     begin
         print 'Debe ingresar al menos un tipo de movimiento.'
-        return
+        return;
     end
 
     -- CASO 1: Si viene REEMBOLSO, prioridad total (movimiento positivo)
@@ -2471,7 +2465,7 @@ begin
         if not exists (select 1 from socio.reembolso where id = @id_reembolso)
         begin
             print 'No existe el reembolso indicado.'
-            return
+            return;
         end
 
         select @monto = monto from socio.reembolso where id = @id_reembolso
@@ -2482,7 +2476,7 @@ begin
         if not exists (select 1 from socio.pago where id = @id_pago)
         begin
             print 'No existe el pago indicado.'
-            return
+            return;
         end
 
         select @monto = monto from socio.pago where id = @id_pago
@@ -2493,7 +2487,7 @@ begin
         if not exists (select 1 from socio.factura where id = @id_factura)
         begin
             print 'No existe la factura indicada.'
-            return
+            return;
         end
 
         select @monto = -1 * total from socio.factura where id = @id_factura
@@ -2517,6 +2511,1050 @@ go
 -- No permitido en el sistema
 /*************************************************************************/
 /*********************** FIN MOVIMIENTO CUENTA ***************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/***************************** INICIO ROL ********************************/
+/*************************************************************************/
+-- INSERT
+create or alter procedure general.agregarRol
+    @descripcion varchar(100)
+as
+begin
+    set nocount on;
+
+    -- Descripción no puede ser nula ni vacía
+    if @descripcion is null or ltrim(rtrim(@descripcion)) = ''
+    begin
+        print 'La descripción no puede estar vacía.';
+        return;
+    end
+
+    insert into general.rol (descripcion)
+    values (@descripcion);
+
+    print 'Rol agregado correctamente.';
+end;
+go
+
+-- UPDATE
+create or alter procedure general.modificarRol
+    @id int,
+    @descripcion varchar(100)
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- La descripción no puede ser nula ni vacía
+    if @descripcion is null or ltrim(rtrim(@descripcion)) = ''
+    begin
+        print 'La descripción no puede estar vacía.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.rol where id = @id)
+    begin
+        print 'Rol no encontrado.';
+        return;
+    end
+
+    update general.rol
+    set descripcion = @descripcion
+    where id = @id;
+
+    print 'Rol actualizado correctamente.';
+end;
+go
+
+-- DELETE
+create or alter procedure general.eliminarRol
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.rol where id = @id)
+    begin
+        print 'Rol no encontrado.';
+        return;
+    end
+
+    -- Validar que no existan cuentas de acceso con este rol
+    if exists (select 1 from general.cuenta_acceso where id_rol = @id)
+    begin
+        print 'No se puede eliminar porque existen cuentas de acceso asociadas a este rol.';
+        return;
+    end
+
+    delete from general.rol
+    where id = @id;
+
+    print 'Rol eliminado correctamente.';
+end;
+go
+/*************************************************************************/
+/****************************** FIN ROL **********************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/************************* INICIO ACTIVIDAD ******************************/
+/*************************************************************************/
+-- INSERT
+create or alter procedure general.agregarActividad
+    @nombre varchar(50),
+    @costo decimal(8,2)
+as
+begin
+    set nocount on;
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Costo debe ser mayor a 0
+    if @costo <= 0
+    begin
+        print 'El costo debe ser mayor a cero.';
+        return;
+    end
+
+    insert into general.actividad (nombre, costo)
+    values (@nombre, @costo);
+
+    print 'Actividad agregada correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure general.modificarActividad
+    @id int,
+    @nombre varchar(50),
+    @costo decimal(8,2)
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Costo debe ser mayor a 0
+    if @costo <= 0
+    begin
+        print 'El costo debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.actividad where id = @id)
+    begin
+        print 'Actividad no encontrada.';
+        return;
+    end
+
+    update general.actividad
+    set nombre = @nombre,
+        costo = @costo
+    where id = @id;
+
+    print 'Actividad actualizada correctamente.';
+end;
+go
+
+-- DELETE
+create procedure general.eliminarActividad
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.actividad where id = @id)
+    begin
+        print 'Actividad no encontrada.';
+        return;
+    end
+
+    -- Validar que no existan inscripciones con esta actividad
+    if exists (select 1 from socio.inscripcion_actividad where id_actividad = @id)
+    begin
+        print 'No se puede eliminar porque existen inscripciones asociadas a esta actividad.';
+        return;
+    end
+
+    delete from general.actividad
+    where id = @id;
+
+    print 'Actividad eliminada correctamente.';
+end;
+go
+/*************************************************************************/
+/************************** FIN ACTIVIDAD ********************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/********************** INICIO ACTIVIDAD EXTRA ***************************/
+/*************************************************************************/
+-- INSERT
+create procedure general.agregarActividadExtra
+    @nombre varchar(50),
+    @costo decimal(8,2)
+as
+begin
+    set nocount on;
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Costo debe ser mayor a 0
+    if @costo <= 0
+    begin
+        print 'El costo debe ser mayor a cero.';
+        return;
+    end
+
+    insert into general.actividad_extra (nombre, costo)
+    values (@nombre, @costo);
+
+    print 'Actividad extra agregada correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure general.modificarActividadExtra
+    @id int,
+    @nombre varchar(50),
+    @costo decimal(8,2)
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Costo debe ser mayor a 0
+    if @costo <= 0
+    begin
+        print 'El costo debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.actividad_extra where id = @id)
+    begin
+        print 'Actividad extra no encontrada.';
+        return;
+    end
+
+    update general.actividad_extra
+    set nombre = @nombre,
+        costo = @costo
+    where id = @id;
+
+    print 'Actividad extra actualizada correctamente.';
+end;
+go
+
+-- DELETE
+create procedure general.eliminarActividadExtra
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.actividad_extra where id = @id)
+    begin
+        print 'Actividad extra no encontrada.';
+        return;
+    end
+
+    -- Validar que no existan inscripciones con esta actividad extra
+    if exists (select 1 from socio.inscripcion_actividad where id_actividad_extra = @id)
+    begin
+        print 'No se puede eliminar porque existen inscripciones asociadas a esta actividad extra.';
+        return;
+    end
+
+    delete from general.actividad_extra
+    where id = @id;
+
+    print 'Actividad extra eliminada correctamente.';
+end;
+go
+/*************************************************************************/
+/*********************** FIN ACTIVIDAD EXTRA *****************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/************************ INICIO DIA SEMANA ******************************/
+/*************************************************************************/
+-- INSERT
+create procedure general.agregarDiaSemana
+    @nombre varchar(50)
+as
+begin
+    set nocount on;
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    insert into general.dia_semana (nombre)
+    values (@nombre);
+
+    print 'Día de la semana agregado correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure general.modificarDiaSemana
+    @id int,
+    @nombre varchar(50)
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Nombre no puede ser nulo ni vacío
+    if @nombre is null or ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.dia_semana where id = @id)
+    begin
+        print 'Día de la semana no encontrado.';
+        return;
+    end
+
+    update general.dia_semana
+    set nombre = @nombre
+    where id = @id;
+
+    print 'Día de la semana actualizado correctamente.';
+end;
+go
+
+-- DELETE
+create procedure general.eliminarDiaSemana
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Verificar que el id sea positivo
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que el id exista
+    if not exists (select 1 from general.dia_semana where id = @id)
+    begin
+        print 'Día de la semana no encontrado.';
+        return;
+    end
+
+    -- Verificar que no haya clases con este día
+    if exists (select 1 from general.clase where id_dia_semana = @id)
+    begin
+        print 'No se puede eliminar porque existen clases asignadas a este día.';
+        return;
+    end
+
+    delete from general.dia_semana
+    where id = @id;
+
+    print 'Día de la semana eliminado correctamente.';
+end;
+go
+/*************************************************************************/
+/************************** FIN DIA SEMANA *******************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/************************ INICIO CUENTA ACCESO ***************************/
+/*************************************************************************/
+-- INSERT
+create procedure general.agregarCuentaAcceso
+    @usuario varchar(50),
+    @hashContraseña varchar(50),
+    @vigenciaContraseña date,
+    @idRol int,
+    @idPersona int = null,
+    @idEmpleado int = null
+as
+begin
+    set nocount on;
+
+    -- Validaciones básicas
+    if @usuario is null or ltrim(rtrim(@usuario)) = ''
+    begin
+        print 'El usuario no puede estar vacío.';
+        return;
+    end
+
+    if @hashContraseña is null or ltrim(rtrim(@hashContraseña)) = ''
+    begin
+        print 'La contraseña no puede estar vacía.';
+        return;
+    end
+
+    if @vigenciaContraseña is null
+    begin
+        print 'La vigencia de la contraseña es obligatoria.';
+        return;
+    end
+
+    if @idRol <= 0
+    begin
+        print 'El id del rol debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validación exclusiva para idPersona o idEmpleado (solo uno debe tener valor)
+    if (@idPersona is null and @idEmpleado is null) or
+       (@idPersona is not null and @idEmpleado is not null)
+    begin
+        print 'Debe ingresar idPersona o idEmpleado, pero no ambos ni ninguno.';
+        return;
+    end
+
+    if @idPersona is not null and @idPersona <= 0
+    begin
+        print 'El id de la persona debe ser mayor a cero.';
+        return;
+    end
+
+    if @idEmpleado is not null and @idEmpleado <= 0
+    begin
+        print 'El id del empleado debe ser mayor a cero.';
+        return;
+    end
+
+    -- Verificar que existan referencias
+    if not exists (select 1 from general.rol where id = @idRol)
+    begin
+        print 'El rol especificado no existe.';
+        return;
+    end
+
+    if @idPersona is not null and not exists (select 1 from socio.persona where id = @idPersona)
+    begin
+        print 'La persona especificada no existe.';
+        return;
+    end
+
+    if @idEmpleado is not null and not exists (select 1 from empleado.empleado where id = @idEmpleado)
+    begin
+        print 'El empleado especificado no existe.';
+        return;
+    end
+
+    insert into general.cuenta_acceso
+        (usuario, hash_contraseña, vigencia_contraseña, id_rol, id_persona, id_empleado)
+    values
+        (@usuario, @hashContraseña, @vigenciaContraseña, @idRol, @idPersona, @idEmpleado);
+
+    print 'Cuenta de acceso agregada correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure general.modificarCuentaAcceso
+    @id int,
+    @usuario varchar(50),
+    @hashContraseña varchar(50),
+    @vigenciaContraseña date,
+    @idRol int,
+    @idPersona int = null,
+    @idEmpleado int = null
+as
+begin
+    set nocount on;
+
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    if @usuario is null or ltrim(rtrim(@usuario)) = ''
+    begin
+        print 'El usuario no puede estar vacío.';
+        return;
+    end
+
+    if @hashContraseña is null or ltrim(rtrim(@hashContraseña)) = ''
+    begin
+        print 'La contraseña no puede estar vacía.';
+        return;
+    end
+
+    if @vigenciaContraseña is null
+    begin
+        print 'La vigencia de la contraseña es obligatoria.';
+        return;
+    end
+
+    if @idRol <= 0
+    begin
+        print 'El id del rol debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validación exclusiva para idPersona o idEmpleado (solo uno debe tener valor)
+    if (@idPersona is null and @idEmpleado is null) or
+       (@idPersona is not null and @idEmpleado is not null)
+    begin
+        print 'Debe ingresar idPersona o idEmpleado, pero no ambos ni ninguno.';
+        return;
+    end
+
+    if @idPersona is not null and @idPersona <= 0
+    begin
+        print 'El id de la persona debe ser mayor a cero.';
+        return;
+    end
+
+    if @idEmpleado is not null and @idEmpleado <= 0
+    begin
+        print 'El id del empleado debe ser mayor a cero.';
+        return;
+    end
+
+    if not exists (select 1 from general.cuenta_acceso where id = @id)
+    begin
+        print 'Cuenta de acceso no encontrada.';
+        return;
+    end
+
+    if not exists (select 1 from general.rol where id = @idRol)
+    begin
+        print 'El rol especificado no existe.';
+        return;
+    end
+
+    if @idPersona is not null and not exists (select 1 from socio.persona where id = @idPersona)
+    begin
+        print 'La persona especificada no existe.';
+        return;
+    end
+
+    if @idEmpleado is not null and not exists (select 1 from empleado.empleado where id = @idEmpleado)
+    begin
+        print 'El empleado especificado no existe.';
+        return;
+    end
+
+    update general.cuenta_acceso
+    set usuario = @usuario,
+        hash_contraseña = @hashContraseña,
+        vigencia_contraseña = @vigenciaContraseña,
+        id_rol = @idRol,
+        id_persona = @idPersona,
+        id_empleado = @idEmpleado
+    where id = @id;
+
+    print 'Cuenta de acceso actualizada correctamente.';
+end;
+go
+
+-- DELETE
+-- DELETE
+create procedure general.eliminarCuentaAcceso
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que la cuenta de acceso exista
+    if not exists (select 1 from general.cuenta_acceso where id = @id)
+    begin
+        print 'Cuenta de acceso no encontrada.';
+        return;
+    end
+
+    -- Eliminar la cuenta de acceso
+    delete from general.cuenta_acceso
+    where id = @id;
+
+    print 'Cuenta de acceso eliminada correctamente.';
+end;
+go
+/*************************************************************************/
+/************************* FIN CUENTA ACCESO *****************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/**************************** INICIO CLASE *******************************/
+/*************************************************************************/
+-- INSERT
+create procedure general.agregarClase
+    @horaInicio time,
+    @horaFin time,
+    @idCategoria int,
+    @idActividad int,
+    @idDiaSemana int,
+    @idEmpleado int
+as
+begin
+    set nocount on;
+
+    -- Validar que la hora de inicio sea menor a la hora de fin
+    if @horaInicio >= @horaFin
+    begin
+        print 'La hora de inicio debe ser anterior a la hora de fin.';
+        return;
+    end
+
+    -- Validar que los IDs existan
+    if not exists (select 1 from socio.categoria where id = @idCategoria)
+    begin
+        print 'Categoría no encontrada.';
+        return;
+    end
+
+    if not exists (select 1 from general.actividad where id = @idActividad)
+    begin
+        print 'Actividad no encontrada.';
+        return;
+    end
+
+    if not exists (select 1 from general.dia_semana where id = @idDiaSemana)
+    begin
+        print 'Día de la semana no encontrado.';
+        return;
+    end
+
+    if not exists (select 1 from empleado.empleado where id = @idEmpleado)
+    begin
+        print 'Empleado no encontrado.';
+        return;
+    end
+
+    -- Insertar la nueva clase
+    insert into general.clase (hora_inicio, hora_fin, id_categoria, id_actividad, id_dia_semana, id_empleado)
+    values (@horaInicio, @horaFin, @idCategoria, @idActividad, @idDiaSemana, @idEmpleado);
+
+    print 'Clase agregada correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure general.modificarClase
+    @id int,
+    @horaInicio time,
+    @horaFin time,
+    @idCategoria int,
+    @idActividad int,
+    @idDiaSemana int,
+    @idEmpleado int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que la clase exista
+    if not exists (select 1 from general.clase where id = @id)
+    begin
+        print 'Clase no encontrada.';
+        return;
+    end
+
+    -- Validar que la hora de inicio sea menor a la hora de fin
+    if @horaInicio >= @horaFin
+    begin
+        print 'La hora de inicio debe ser anterior a la hora de fin.';
+        return;
+    end
+
+    -- Validar que los IDs existan
+    if not exists (select 1 from socio.categoria where id = @idCategoria)
+    begin
+        print 'Categoría no encontrada.';
+        return;
+    end
+
+    if not exists (select 1 from general.actividad where id = @idActividad)
+    begin
+        print 'Actividad no encontrada.';
+        return;
+    end
+
+    if not exists (select 1 from general.dia_semana where id = @idDiaSemana)
+    begin
+        print 'Día de la semana no encontrado.';
+        return;
+    end
+
+    if not exists (select 1 from empleado.empleado where id = @idEmpleado)
+    begin
+        print 'Empleado no encontrado.';
+        return;
+    end
+
+    -- Actualizar la clase
+    update general.clase
+    set hora_inicio = @horaInicio,
+        hora_fin = @horaFin,
+        id_categoria = @idCategoria,
+        id_actividad = @idActividad,
+        id_dia_semana = @idDiaSemana,
+        id_empleado = @idEmpleado
+    where id = @id;
+
+    print 'Clase actualizada correctamente.';
+end;
+go
+
+-- DELETE
+create procedure general.eliminarClase
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que la clase exista
+    if not exists (select 1 from general.clase where id = @id)
+    begin
+        print 'Clase no encontrada.';
+        return;
+    end
+
+    -- Eliminar la clase
+    delete from general.clase where id = @id;
+
+    print 'Clase eliminada correctamente.';
+end;
+go
+/*************************************************************************/
+/**************************** FIN CLASE **********************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/************************** INICIO PUESTO ********************************/
+/*************************************************************************/
+-- INSERT
+create procedure empleado.agregarPuesto
+    @nombre varchar(50)
+as
+begin
+    set nocount on;
+
+    -- Validar que el nombre no sea nulo ni vacío
+    if ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Insertar el nuevo puesto
+    insert into empleado.puesto (nombre)
+    values (@nombre);
+
+    print 'Puesto agregado correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure empleado.modificarPuesto
+    @id int,
+    @nombre varchar(50)
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que el puesto exista
+    if not exists (select 1 from empleado.puesto where id = @id)
+    begin
+        print 'Puesto no encontrado.';
+        return;
+    end
+
+    -- Validar que el nombre no sea vacío
+    if ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    -- Actualizar el puesto
+    update empleado.puesto
+    set nombre = @nombre
+    where id = @id;
+
+    print 'Puesto actualizado correctamente.';
+end;
+go
+
+-- DELETE
+create procedure empleado.eliminarPuesto
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que el puesto exista
+    if not exists (select 1 from empleado.puesto where id = @id)
+    begin
+        print 'Puesto no encontrado.';
+        return;
+    end
+
+    -- Validar que el puesto no esté asignado a ningún empleado
+    if exists (select 1 from empleado.empleado where id_puesto = @id)
+    begin
+        print 'No se puede eliminar el puesto porque está asignado a uno o más empleados.';
+        return;
+    end
+
+    -- Eliminar el puesto
+    delete from empleado.puesto where id = @id;
+
+    print 'Puesto eliminado correctamente.';
+end;
+go
+/*************************************************************************/
+/**************************** FIN PUESTO *********************************/
+/*************************************************************************/
+
+/*************************************************************************/
+/************************* INICIO EMPLEADO *******************************/
+/*************************************************************************/
+-- INSERT
+create procedure empleado.agregarEmpleado
+    @nombre varchar(50),
+    @apellido varchar(50),
+    @idPuesto int
+as
+begin
+    set nocount on;
+
+    -- Validar que el nombre y apellido no sean vacíos
+    if ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    if ltrim(rtrim(@apellido)) = ''
+    begin
+        print 'El apellido no puede estar vacío.';
+        return;
+    end
+
+    -- Validar que el puesto exista
+    if not exists (select 1 from empleado.puesto where id = @idPuesto)
+    begin
+        print 'Puesto no encontrado.';
+        return;
+    end
+
+    -- Insertar el nuevo empleado
+    insert into empleado.empleado (nombre, apellido, id_puesto)
+    values (@nombre, @apellido, @idPuesto);
+
+    print 'Empleado agregado correctamente.';
+end;
+go
+
+-- UPDATE
+create procedure empleado.modificarEmpleado
+    @id int,
+    @nombre varchar(50),
+    @apellido varchar(50),
+    @idPuesto int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que el empleado exista
+    if not exists (select 1 from empleado.empleado where id = @id)
+    begin
+        print 'Empleado no encontrado.';
+        return;
+    end
+
+    -- Validar que el nombre y apellido no sean vacíos
+    if ltrim(rtrim(@nombre)) = ''
+    begin
+        print 'El nombre no puede estar vacío.';
+        return;
+    end
+
+    if ltrim(rtrim(@apellido)) = ''
+    begin
+        print 'El apellido no puede estar vacío.';
+        return;
+    end
+
+    -- Validar que el puesto exista
+    if not exists (select 1 from empleado.puesto where id = @idPuesto)
+    begin
+        print 'Puesto no encontrado.';
+        return;
+    end
+
+    -- Actualizar el empleado
+    update empleado.empleado
+    set nombre = @nombre,
+        apellido = @apellido,
+        id_puesto = @idPuesto
+    where id = @id;
+
+    print 'Empleado actualizado correctamente.';
+end;
+go
+
+-- DELETE
+create procedure empleado.eliminarEmpleado
+    @id int
+as
+begin
+    set nocount on;
+
+    -- Validar que el id sea mayor a cero
+    if @id <= 0
+    begin
+        print 'El id debe ser mayor a cero.';
+        return;
+    end
+
+    -- Validar que el empleado exista
+    if not exists (select 1 from empleado.empleado where id = @id)
+    begin
+        print 'Empleado no encontrado.';
+        return;
+    end
+
+    -- Validar que el empleado no esté asignado a ninguna clase
+    if exists (select 1 from general.clase where id_empleado = @id)
+    begin
+        print 'No se puede eliminar el empleado porque está asignado a una o más clases.';
+        return;
+    end
+
+    -- Eliminar el empleado
+    delete from empleado.empleado where id = @id;
+
+    print 'Empleado eliminado correctamente.';
+end;
+go
+/*************************************************************************/
+/*************************** FIN EMPLEADO ********************************/
 /*************************************************************************/
 ---------------------------------------------------------------------------
 -------------------------- FIN PROCEDIMIENTOS -----------------------------
