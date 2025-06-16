@@ -497,8 +497,8 @@ begin
 		edad_max = @max
 	where @nombre = nombre
 end
--- ESTADO INSCRIPCION
 
+-- ESTADO INSCRIPCION
 create or alter procedure socio.agregarEstadoInscripcion
 	@descripcion varchar(100),
 	@id_est int output
@@ -508,6 +508,7 @@ begin
 	set @id_est = (select estado_inscripcion.estado from socio.estado_inscripcion where @descripcion = estado_inscripcion.estado)
 	return @id_est
 end
+
 -- GRUPO FAMILIAR
 create or alter procedure socio.agregargrupo_familiar
 	(
@@ -521,6 +522,7 @@ create or alter procedure socio.agregargrupo_familiar
 as
 begin 
 end
+
 --SOCIO
 create or alter procedure socio.inscripcionSocio
 	(
@@ -532,9 +534,64 @@ begin
 	--codigo
 end
 
+-- 	INVITADO
 create or alter procedure socio.cargarInvitado
-	(
-	)
+    @nombre varchar(50),
+    @apellido varchar(50),
+    @dni int,
+    @id_persona_asociada int
 as
 begin
+    insert into socio.invitado (nombre, apellido, dni, id_persona_asociada)
+    values (@nombre, @apellido, @dni, @id_persona_asociada);
 end
+
+create or alter procedure socio.actualizarInvitado
+    @id int,
+    @nombre varchar(50),
+    @apellido varchar(50),
+    @dni int,
+    @id_persona_asociada int
+as
+begin
+    update socio.invitado
+    set nombre = @nombre,
+        apellido = @apellido,
+        dni = @dni,
+        id_persona_asociada = @id_persona_asociada
+    where id = @id;
+end;
+go
+
+-- INSCRIPCION
+create or alter procedure socio.insertarInscripcion
+    @id varchar(10),
+    @id_persona int,
+    @id_grupo_familiar int = null,
+    @fecha_inicio datetime,
+    @fecha_baja datetime = null,
+    @id_estado int,
+    @id_categoria int,
+    @id_medio_pago int
+as
+begin
+    insert into socio.inscripcion (id, id_persona, id_grupo_familiar, fecha_inicio, fecha_baja, id_estado, id_categoria, id_medio_pago)
+    values (@id, @id_persona, @id_grupo_familiar, @fecha_inicio, @fecha_baja, @id_estado, @id_categoria, @id_medio_pago);
+end;
+go
+
+create or alter procedure socio.actualizarInscripcion
+    @id varchar(10),
+    @id_persona int,
+    @id_grupo_familiar int = null,
+    @fecha_inicio datetime,
+    @fecha_baja datetime = null,
+    @id_estado int,
+    @id_categoria int,
+    @id_medio_pago int
+as
+begin
+	
+end;
+go
+
