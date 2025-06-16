@@ -2257,6 +2257,8 @@ create or alter procedure socio.insertarMovimientoCuenta
 as
 begin
     declare @monto decimal(8,2)
+	declare @montoAux decimal(8,2)
+	declare @descripcionTipoReembolso varchar(50);
 
     -- Validar que la cuenta corriente exista
     if not exists (select 1 from socio.cuenta_corriente where id = @id_cuenta_corriente)
@@ -2281,7 +2283,18 @@ begin
             return;
         end
 
-        select @monto = monto from socio.reembolso where id = @id_reembolso
+		select 
+			@monto = monto,
+			@descripcionTipoReembolso = tr.descripcion
+		from socio.reembolso r
+		inner join socio.tipo_reembolso tr on r.id_tipo_reembolso = tr.id
+		where r.id = @id_reembolso;
+
+		-- Guardo en montoAux el monto de los que no son pago a cuenta, que descontaremos luego del total para no impactar en la cuenta corriente estos casos
+		if @descripcionTipoReembolso <> 'Pago a cuenta'
+		begin
+			set @montoAux = @monto;
+		end
     end
     -- CASO 2: Si no viene reembolso pero viene PAGO (movimiento positivo)
     else if @id_pago is not null
@@ -2309,6 +2322,9 @@ begin
     -- Insertar el movimiento
     insert into socio.movimiento_cuenta (id_cuenta_corriente, fecha, monto, id_factura, id_pago, id_reembolso)
     values (@id_cuenta_corriente, @fecha, @monto, @id_factura, @id_pago, @id_reembolso)
+
+	-- Restamos al monto total aquellos saldos que no son pago a cuenta que no impactan en la cuenta corriente
+	set @monto = @monto - @montoAux;
 
     -- Actualizar saldo de la cuenta corriente
     exec socio.actualizarCuentaCorriente @id = @id_cuenta_corriente, @saldo = @monto;
