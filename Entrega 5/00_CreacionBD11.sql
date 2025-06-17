@@ -1853,12 +1853,31 @@ begin
 
             set @monto_total += isnull(@costo_categoria,0);
 
+            -- Si es parte del grupo familiar, le hacemos un descuento del 15% a su membresia
+            declare @id_grupo_familiar int;
+            select @id_grupo_familiar = i.id_grupo_familiar
+            from socio.factura f
+            join socio.inscripcion i on f.id_inscripcion = i.id
+            where f.id_inscripcion = @id_inscripcion;
+            
+            if @id_grupo_familiar is not null
+            begin
+                set @monto_total = @monto_total * 0.85;
+            end
+
             -- Sumar costos de actividades
             declare @monto_actividades decimal(8,2) = 0;
-            select @monto_actividades = isnull(sum(a.costo),0)
+            declare @cantidad_actividades int = 0;
+            select @monto_actividades = isnull(sum(a.costo),0), @cantidad_actividades = count(*)
             from socio.inscripcion_actividad ia
             join general.actividad a on ia.id_actividad = a.id
             where ia.id_inscripcion = @id_inscripcion;
+
+            -- Si hay mas de una actividad deportiva, le hacemos el 10% de descuento sobre el total de las actividades deportivas
+            if @cantidad_actividades > 1
+            begin
+                set @monto_actividades = @monto_actividades * 0.9;
+            end
 
             set @monto_total += @monto_actividades;
 

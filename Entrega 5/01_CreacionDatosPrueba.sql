@@ -9,6 +9,8 @@
 		- Costanzo, Marcos Ezequiel - 40955907
 		- Sanchez, Diego Mauricio - 46361081
 */
+use Com2900G11;
+go
 
 -- Datos Obra Social
 insert into socio.datos_obra_social (nombre, telefono_emergencia) values ('OSDE', '0800-555-6733');
