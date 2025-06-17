@@ -203,7 +203,7 @@ create table socio.medio_de_pago
 create table socio.inscripcion
 (
 	id					int primary key identity(1,1),
-	numero_socio		varchar(10) CHECK(id like 'SN-_%'),
+	numero_socio		varchar(10) CHECK(numero_socio like 'SN-_%'),
 	id_persona			int NOT NULL,
 	id_grupo_familiar	int,
 	fecha_inicio		datetime NOT NULL,
@@ -1778,7 +1778,7 @@ go
 /********************** INICIO FACTURA CON ITEMS *************************/
 /*************************************************************************/
 -- INSERT
-create or alter procedure socio.insertarFacturaCompleta
+create or alter procedure socio.insertarFacturaCompletaPersona
     @fecha_generacion date,
     @fecha_vencimiento_1 date,
     @fecha_vencimiento_2 date,
@@ -1793,6 +1793,7 @@ begin
     declare @monto_total decimal(8,2) = 0;
     declare @id_factura int;
 	declare @id_cuenta_corriente int;
+    declare @fecha datetime = getdate();
 
     -- Validaciones básicas
 
@@ -1876,9 +1877,13 @@ begin
         if @id_registro_pileta is not null
         begin
             declare @costo_pileta decimal(8,2) = 0;
-            select @costo_pileta = costo
-            from socio.registro_pileta
-            where id = @id_registro_pileta;
+
+            -- Buscamos el precio
+            select @costo_pileta = tp.precio
+            from socio.registro_pileta rp
+            inner join socio.tarifa_pileta tp
+                on rp.id_tarifa = tp.id
+            where rp.id = @id_registro_pileta;
 
             set @monto_total += isnull(@costo_pileta,0);
         end
@@ -1910,8 +1915,8 @@ begin
 		-- Insertamos el movimiento en la cuenta
 		exec socio.insertarMovimientoCuenta
 			@id_cuenta_corriente = @id_cuenta_corriente,
-			@fecha = getdate(),
-			@monto = -@monto_total,
+			@fecha = @fecha,
+			@monto = @monto_total,
 			@id_factura = @id_factura,
 			@id_pago = null,
 			@id_reembolso = null;
@@ -1946,10 +1951,9 @@ begin
         if @id_registro_pileta is not null
         begin
             insert into socio.item_factura (id_factura, monto, tipo_item)
-            select @id_factura, costo, 'Uso de Pileta'
+            select @id_factura, @costo_pileta, 'Uso de Pileta'
             from socio.registro_pileta
-            where id = @id_registro_pileta
-              and costo > 0;
+            where id = @id_registro_pileta;
         end
 
         commit transaction;
@@ -1989,6 +1993,7 @@ begin
 	set nocount on;
 
 	declare @id_cuenta_corriente int;
+    declare @fecha datetime = getdate();
 
     -- Validación de monto mayor a 0
     if @monto <= 0
@@ -2011,6 +2016,9 @@ begin
 		insert into socio.pago (fecha_pago, monto, es_debito_automatico, id_factura)
 		values (@fecha_pago, @monto, @es_debito_automatico, @id_factura);
 
+        declare @id_pago int;
+        set @id_pago = scope_identity();
+
 		-- Obtener cuenta corriente
 		select @id_cuenta_corriente = cc.id
 		from socio.cuenta_corriente cc
@@ -2021,10 +2029,10 @@ begin
 		-- Insertamos el movimiento en la cuenta
 		exec socio.insertarMovimientoCuenta
 			@id_cuenta_corriente = @id_cuenta_corriente,
-			@fecha = getdate(),
-			@monto = -@monto_total,
-			@id_factura = @id_factura,
-			@id_pago = null,
+			@fecha = @fecha,
+			@monto = @monto,
+			@id_factura = null,
+			@id_pago = @id_pago,
 			@id_reembolso = null;
 		
 		commit transaction;
@@ -2065,7 +2073,8 @@ begin
     set nocount on;
 
 	declare @id_cuenta_corriente int;
-	declare @id_reembolso int;
+    declare @fecha datetime = getdate();
+
     -- Validar que exista el pago asociado
     if not exists (select 1 from socio.pago where id = @id_pago)
     begin
@@ -2107,8 +2116,10 @@ begin
 		-- Insertar el reembolso
 		insert into socio.reembolso (id_pago, monto, fecha_reembolso, motivo, id_tipo_reembolso)
 		values (@id_pago, @monto, @fecha_reembolso, @motivo, @id_tipo_reembolso);
-		
+
+		declare @id_reembolso int;
 		set @id_reembolso = scope_identity();
+
 		-- Obtener cuenta corriente
 		select @id_cuenta_corriente = cc.id
 		from socio.reembolso r
@@ -2121,11 +2132,11 @@ begin
 		-- Insertamos el movimiento en la cuenta
 		exec socio.insertarMovimientoCuenta
 			@id_cuenta_corriente = @id_cuenta_corriente,
-			@fecha = getdate(),
-			@monto = -@monto_total,
-			@id_factura = @id_factura,
+			@fecha = @fecha,
+			@monto = @monto,
+			@id_factura = null,
 			@id_pago = null,
-			@id_reembolso = null;
+			@id_reembolso = @id_reembolso;
 
 		commit transaction;
 
@@ -2256,12 +2267,12 @@ go
 create or alter procedure socio.insertarMovimientoCuenta
     @id_cuenta_corriente int,
     @fecha datetime,
+    @monto decimal(8,2),
     @id_factura int = null,
     @id_pago int = null,
     @id_reembolso int = null
 as
 begin
-    declare @monto decimal(8,2)
 	declare @montoAux decimal(8,2)
 	declare @descripcionTipoReembolso varchar(50);
 
@@ -2288,13 +2299,6 @@ begin
             return;
         end
 
-		select 
-			@monto = monto,
-			@descripcionTipoReembolso = tr.descripcion
-		from socio.reembolso r
-		inner join socio.tipo_reembolso tr on r.id_tipo_reembolso = tr.id
-		where r.id = @id_reembolso;
-
 		-- Guardo en montoAux el monto de los que no son pago a cuenta, que descontaremos luego del total para no impactar en la cuenta corriente estos casos
 		if @descripcionTipoReembolso <> 'Pago a cuenta'
 		begin
@@ -2309,8 +2313,6 @@ begin
             print 'No existe el pago indicado.'
             return;
         end
-
-        select @monto = monto from socio.pago where id = @id_pago
     end
     -- CASO 3: Solo factura (movimiento negativo)
     else if @id_factura is not null
@@ -2321,7 +2323,7 @@ begin
             return;
         end
 
-        select @monto = -1 * total from socio.factura where id = @id_factura
+        set @monto = -1 * @monto;
     end
 
     -- Insertar el movimiento
