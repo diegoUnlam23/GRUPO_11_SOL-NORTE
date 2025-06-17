@@ -1,3 +1,15 @@
+/*
+	- Consigna:
+		Cara de datos iniciales
+	- Fecha de entrega: 17/06/2025
+	- Número de comisión: 2900 
+	- Número de grupo: 11
+	- Nombre de la materia: Bases de Datos Aplicadas
+	- Integrantes:
+		- Costanzo, Marcos Ezequiel - 40955907
+		- Sanchez, Diego Mauricio - 46361081
+*/
+
 -- Datos Obra Social
 insert into socio.datos_obra_social (nombre, telefono_emergencia) values ('OSDE', '0800-555-6733');
 insert into socio.datos_obra_social (nombre, telefono_emergencia) values ('Swiss Medical', '0800-444-7700');
