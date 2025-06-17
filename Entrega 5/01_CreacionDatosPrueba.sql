@@ -340,9 +340,6 @@ exec socio.insertarFacturaCompletaPersona
     @id_registro_pileta = null,
     @id_estado_factura  = 1;  -- asumimos estado 'pendiente'
 
-declare @fecha datetime = getdate();
-declare @fecha_venc_1 datetime = dateadd(day, 30, @fecha);
-declare @fecha_venc_2 datetime = dateadd(day, 60, @fecha);
 -- Factura solo por uso de pileta (registro sin inscripción)
 exec socio.insertarFacturaCompletaInvitado
     @fecha_generacion   = @fecha,
@@ -352,9 +349,6 @@ exec socio.insertarFacturaCompletaInvitado
     @id_registro_pileta = 5,
     @id_estado_factura  = 1;
 
-declare @fecha datetime = getdate();
-declare @fecha_venc_1 datetime = dateadd(day, 30, @fecha);
-declare @fecha_venc_2 datetime = dateadd(day, 60, @fecha);
 -- Factura mixta: inscripción + uso de pileta (ambos aplicados)
 exec socio.insertarFacturaCompletaPersona
     @fecha_generacion   = @fecha,
@@ -401,27 +395,9 @@ exec socio.agregarReembolso
 
 -- Reembolso 2: Del pago 2, tipo de reembolso 2
 exec socio.agregarReembolso
-    @id_pago = 2,
+    @id_pago = 3,
     @monto = 1500.00,
     @fecha_reembolso = '2024-06-21',
     @motivo = 'Reembolso por servicio no prestado',
     @id_tipo_reembolso = 2;
 go
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
