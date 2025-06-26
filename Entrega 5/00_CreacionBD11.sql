@@ -117,7 +117,7 @@ create table socio.categoria
 (
 	id			    int primary key identity(1,1),
 	nombre		    varchar(10) NOT NULL,
-	costo_mensual   decimal(8,2) NOT NULL CHECK(costo > 0),
+	costo_mensual   decimal(8,2) NOT NULL CHECK(costo_mensual > 0),
 	edad_min	    int NOT NULL,
 	edad_max	    int NOT NULL 
 );
