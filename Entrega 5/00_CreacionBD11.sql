@@ -41,13 +41,12 @@ go
 -- Obra Social Socio
 create table socio.obra_social_socio
 (
-	id 			 int primary key identity(1,1),
+	id 			        int primary key identity(1,1),
 	nombre				varchar(50) NOT NULL,
 	telefono_emergencia	varchar(50) NOT NULL,
-	numero_socio varchar(50) NOT NULL
+	numero_socio        varchar(50) NOT NULL
 );
 go
-
 
 -- Tutor
 create table socio.tutor
@@ -61,17 +60,13 @@ create table socio.tutor
 	responsable_pago	bit,
 );
 go
-create table socio.grupo_familiar
-(
-	id int primary key identity(1,1)
-);
-go
---socio
+
+-- Socio
 create table socio.socio
 (
 	id						int primary key identity(1,1),
-	nombre					varchar(50) NOT NULL,
-	apellido				varchar(50) NOT NULL,
+	nombre					varchar(100) NOT NULL,
+	apellido				varchar(100) NOT NULL,
 	dni						int UNIQUE NOT NULL CHECK(dni > 0),
 	email					varchar(254) CHECK(email like '_%@_%._%'),
 	fecha_nacimiento		date NOT NULL,
@@ -85,22 +80,25 @@ create table socio.socio
 	responsable_pago		bit,
 	foreign key (id_obra_social_socio) references socio.obra_social_socio(id),
 	foreign key (id_tutor) references socio.tutor(id),
-	foreign key (id_grupo_familiar) references socio.grupo_familiar(id)
+	foreign key (id_grupo_familiar) references socio.socio(id)
 );
+go
+
 --Inscripcion
 create table socio.inscripcion
 (
-	id				int primary key identity(1,1),
-	id_socio		int NOT NULL UNIQUE,
-	f_inscripcion	date NOT NULL,
+	id				    int primary key identity(1,1),
+	id_socio		    int NOT NULL UNIQUE,
+	fecha_inscripcion	date NOT NULL,
 	foreign key (id_socio) references socio.socio(id)
 );
+go
 ---------------------------------------------------------------------------
 ---------------------------- FIN TABLAS SOCIO -----------------------------
 ---------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------
--------------------- TABLA EMPLEADO ----------------------
+----------------------------- TABLA EMPLEADO ------------------------------
 ---------------------------------------------------------------------------
 
 -- Empleado
@@ -109,6 +107,7 @@ create table general.empleado
 	id			int primary key identity(1,1),
 	nombre		varchar(50) NOT NULL,
 );
+go
 
 ---------------------------------------------------------------------------
 ----------------------- TABLAS INSCRIPCION Y CLASE ------------------------
@@ -116,12 +115,13 @@ create table general.empleado
 -- Categoria
 create table socio.categoria
 (
-	id			int primary key identity(1,1),
-	nombre		varchar(10) NOT NULL,
-	costo		decimal(8,2) NOT NULL CHECK(costo > 0),
-	edad_min	int NOT NULL,
-	edad_max	int NOT NULL 
+	id			    int primary key identity(1,1),
+	nombre		    varchar(10) NOT NULL,
+	costo_mensual   decimal(8,2) NOT NULL CHECK(costo > 0),
+	edad_min	    int NOT NULL,
+	edad_max	    int NOT NULL 
 );
+go
 
 -- Medio de Pago
 create table socio.medio_de_pago
@@ -129,6 +129,7 @@ create table socio.medio_de_pago
 	id		int primary key identity(1,1),
 	tipo	varchar(50) NOT NULL
 );
+go
 
 -- Inscripcion
 create table socio.cuota
@@ -154,13 +155,12 @@ go
 create table socio.invitado
 (
 	id						int primary key identity(1,1),
-	nombre					varchar(50) NOT NULL,
-	apellido				varchar(50) NOT NULL,
+	nombre					varchar(100) NOT NULL,
+	apellido				varchar(100) NOT NULL,
 	dni						int UNIQUE NOT NULL CHECK(dni > 0),
-	email					varchar(254) CHECK(email like '_%@_%._%'),
-	id_socio_asociado		int NOT NULL,
-	foreign key (id_socio_asociado) references socio.socio(id)
+	email					varchar(254) CHECK(email like '_%@_%._%')
 );
+go
 
 -- Tarifa Pileta
 create table socio.tarifa_pileta
@@ -169,15 +169,16 @@ create table socio.tarifa_pileta
 	tipo	varchar(50) COLLATE modern_spanish_CI_AS CHECK(tipo IN('Socio','Invitado')),
 	precio	decimal(8,2) NOT NULL check(precio >= 0)
 );
+go
 
 -- Registro Pileta
 create table socio.registro_pileta
 (
-	id				int primary key identity(1,1),
-	id_socio		int,
-	id_invitado 	int,
-	fecha			date NOT NULL,
-	id_tarifa		int NOT NULL,
+	id				    int primary key identity(1,1),
+	id_socio		    int,
+	id_invitado 	    int,
+	fecha			    date NOT NULL,
+	id_tarifa		    int NOT NULL,
 	id_medio_de_pago	int NOT NULL,
 	foreign key (id_medio_de_pago) references socio.medio_de_pago(id),
 	foreign key (id_socio) references socio.socio(id),
@@ -196,10 +197,11 @@ go
 -- Actividad
 create table general.actividad
 (
-	id		int primary key identity(1,1),
-	nombre	varchar(50) NOT NULL,
-	costo	decimal(8,2) NOT NULL
+	id		        int primary key identity(1,1),
+	nombre	        varchar(50) NOT NULL,
+	costo_mensual   decimal(8,2) NOT NULL
 );
+go
 
 -- Actividad Extra
 create table general.actividad_extra
@@ -210,6 +212,7 @@ create table general.actividad_extra
 	id_medio_de_pago	int NOT NULL,
 	foreign key (id_medio_de_pago) references socio.medio_de_pago(id)
 );
+go
 
 
 -- Inscripcion Actividad
@@ -222,6 +225,7 @@ create table socio.inscripcion_actividad
 	foreign key (id_cuota) references socio.cuota(id),
 	foreign key (id_actividad) references general.actividad(id),
 );
+go
 
 -- Clase
 create table general.clase
@@ -229,6 +233,7 @@ create table general.clase
 	id				int primary key identity(1,1),
 	hora_inicio		time NOT NULL,
 	hora_fin		time NOT NULL,
+    dia VARCHAR(10) NOT NULL CHECK (dia IN ('Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo')),
 	id_categoria	int NOT NULL,
 	id_actividad	int NOT NULL,
 	id_empleado		int NOT NULL,
@@ -242,11 +247,12 @@ create table general.presentismo
 (
 	id				int primary key identity(1,1),
 	id_socio		int,
-	id_clase		int,
+	id_clase		int NOT NULL,
 	fecha			datetime,
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_clase) references general.clase(id)
 )
+go
 ---------------------------------------------------------------------------
 ---------------------- FIN TABLAS CLASE / ACTIVIDAD -----------------------
 ---------------------------------------------------------------------------
@@ -255,64 +261,83 @@ create table general.presentismo
 ---------------------------------------------------------------------------
 ------------------------- TABLAS PAGO Y FACTURA ---------------------------
 ---------------------------------------------------------------------------
--- Cuenta Corriente
+-- Estado Cuenta
 create table socio.estado_cuenta
 (
 	id			int primary key identity(1,1),
 	id_socio	int NOT NULL,
-	saldo		decimal(8,2),
+	saldo		decimal(8,2) NOT NULL,
 	foreign key (id_socio) references socio.socio(id)
 );
+go
 
 -- Factura cuouta
 create table socio.factura_cuota
 (
 	id						int primary key identity(1,1),
-	fecha_generacion		date NOT NULL,
+    numero_comprobante      int NOT NULL,
+    tipo_comprobante        varchar(2) NOT NULL,
+	fecha_emision   		date NOT NULL,
+    periodo_facturado       int NOT NULL,
+    iva                     varchar(50) NOT NULL,
 	fecha_vencimiento_1		date NOT NULL,
 	fecha_vencimiento_2		date NOT NULL,
-	monto					decimal(8,2),
-	descripcion				varchar(100) NOT NULL,
+	importe_total			decimal(8,2),
+	descripcion 			varchar(100) NOT NULL,
 	id_cuota				int,
-	id_registro_pileta		int,
-	foreign key (id_cuota) references socio.cuota(id),
-	foreign key (id_registro_pileta) references socio.registro_pileta(id),
+	foreign key (id_cuota) references socio.cuota(id)
 );
+go
+
 -- Item Factura cuota
 create table socio.item_factura_cuota
 (
-	id			int primary key identity(1,1),
-	id_factura 	int NOT NULL,
-	monto		decimal(8,2) NOT NULL,
-	tipo_item	varchar(50) NOT NULL,
-	foreign key (id_factura) references socio.factura_cuota(id)
+	id			        int primary key identity(1,1),
+	id_factura_cuota 	int NOT NULL,
+    cantidad            int NOT NULL,
+    precio_unitario     decimal(8,2) NOT NULL,
+    alicuota_iva        decimal(8,2) NOT NULL,
+    tipo_item           varchar(50) NOT NULL,
+    subtotal            decimal(8,2) NOT NULL,
+    importe_total       decimal(8,2) NOT NULL,
+	foreign key (id_factura_cuota) references socio.factura_cuota(id)
 );
+go
 
 -- Factura extra
 create table socio.factura_extra
 (
 	id						int primary key identity(1,1),
-	fecha_generacion		date NOT NULL,
+    numero_comprobante      int NOT NULL,
+    tipo_comprobante        varchar(2) NOT NULL,
+	fecha_emision   		date NOT NULL,
+    periodo_facturado       int NOT NULL,
+    iva                     varchar(50) NOT NULL,
 	fecha_vencimiento_1		date NOT NULL,
 	fecha_vencimiento_2		date NOT NULL,
-	monto					decimal(8,2),
-	descripcion				varchar(100) NOT NULL,
+	importe_total			decimal(8,2),
+	descripcion 			varchar(100) NOT NULL,
+    id_registro_pileta		int,
 	id_actividad_extra		int,
-	id_registro_pileta		int,
-	
-	foreign key (id_actividad_extra) references general.actividad_extra(id),
 	foreign key (id_registro_pileta) references socio.registro_pileta(id),
+    foreign key (id_actividad_extra) references general.actividad_extra(id)
 );
+go
 
 -- Item Factura extra
 create table socio.item_factura_extra
 (
-	id			int primary key identity(1,1),
-	id_factura 	int NOT NULL,
-	monto		decimal(8,2) NOT NULL,
-	tipo_item	varchar(50) NOT NULL,
-	foreign key (id_factura) references socio.factura_extra(id)
+	id			        int primary key identity(1,1),
+	id_factura_extra 	int NOT NULL,
+    cantidad            int NOT NULL,
+    precio_unitario     decimal(8,2) NOT NULL,
+    alicuota_iva        decimal(8,2) NOT NULL,
+    tipo_item           varchar(50) NOT NULL,
+    subtotal            decimal(8,2) NOT NULL,
+    importe_total       decimal(8,2) NOT NULL,
+	foreign key (id_factura_extra) references socio.factura_extra(id)
 );
+go
 
 -- Pago
 create table socio.pago
@@ -320,12 +345,13 @@ create table socio.pago
 	id						int primary key identity (1,1),
 	fecha_pago				date NOT NULL,
 	monto					decimal(8,2) NOT NULL,
-	es_debito_automatico	bit default 0,
+	es_debito_automatico	bit default 0 NOT NULL,
 	id_factura_cuota		int,
 	id_factura_extra		int,
 	foreign key (id_factura_cuota) references socio.factura_cuota(id),
 	foreign key (id_factura_extra) references socio.factura_extra(id)
 );
+go
 
 -- Tipo Reembolso
 create table socio.tipo_reembolso
@@ -333,6 +359,7 @@ create table socio.tipo_reembolso
 	id				int primary key identity (1,1),
 	descripcion		varchar(50) NOT NULL
 );
+go
 
 -- Reembolso
 create table socio.reembolso
@@ -346,6 +373,7 @@ create table socio.reembolso
 	foreign key (id_pago) references socio.pago(id),
 	foreign key (id_tipo_reembolso) references socio.tipo_reembolso(id)
 );
+go
 
 -- Movimiento Cuenta
 create table socio.movimiento_cuenta
