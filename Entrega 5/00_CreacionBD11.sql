@@ -28,8 +28,7 @@ use Com2900G11;
 go
 
 -- Creación de Esquemas
-create schema empleado;--TABLAS Y SP PARA PROFESORES
-go
+
 create schema general; -- TABLAS Y SP QUE USAN TODOS LOS SCHEMAS
 go
 create schema socio; -- TABLAS Y SP PARA EL USO DE LOS SOCIOS
@@ -38,25 +37,37 @@ go
 ---------------------------------------------------------------------------
 ------------------------------ TABLAS SOCIO -------------------------------
 ---------------------------------------------------------------------------
-create table socio.datos_obra_social
-(
-	id					int primary key identity(1,1),
-	nombre				varchar(50) NOT NULL,
-	telefono_emergencia	varchar(50) NOT NULL
-);
 
--- Obra Social Persona
-create table socio.obra_social_persona
+-- Obra Social Socio
+create table socio.obra_social_socio
 (
 	id 			 int primary key identity(1,1),
-	id_datos_os	 int NOT NULL,
-	numero_socio varchar(50) NOT NULL,
-	foreign key (id_datos_os) references socio.datos_obra_social(id) 
+	nombre				varchar(50) NOT NULL,
+	telefono_emergencia	varchar(50) NOT NULL,
+	numero_socio varchar(50) NOT NULL
 );
 go
 
--- Persona
-create table socio.persona
+
+-- Tutor
+create table socio.tutor
+(
+	id					int primary key identity(1,1),
+	nombre				varchar(50) NOT NULL,
+	apellido			varchar(50) NOT NULL,
+	dni					int UNIQUE NOT NULL CHECK(dni > 0),
+	email				varchar(254) CHECK(email like '_%@_%._%'),
+	parentesco			varchar(20) NOT NULL,
+	responsable_pago	bit,
+);
+go
+create table socio.grupo_familiar
+(
+	id int primary key identity(1,1)
+);
+go
+--socio
+create table socio.socio
 (
 	id						int primary key identity(1,1),
 	nombre					varchar(50) NOT NULL,
@@ -67,110 +78,37 @@ create table socio.persona
 	telefono				varchar(20) ,
 	telefono_emergencia		varchar(20) ,
 	saldo_actual			decimal(8,2) default 0,
-	id_obra_social_persona	int,
-	foreign key (id_obra_social_persona) references socio.obra_social_persona(id)
+	id_obra_social_socio	int,
+	id_tutor				int,
+	id_grupo_familiar		int,
+	estado					varchar(20),
+	responsable_pago		bit,
+	foreign key (id_obra_social_socio) references socio.obra_social_socio(id),
+	foreign key (id_tutor) references socio.tutor(id),
+	foreign key (id_grupo_familiar) references socio.grupo_familiar(id)
 );
-
--- Grupo Familiar
-create table socio.grupo_familiar
+--Inscripcion
+create table socio.inscripcion
 (
-	id							int identity(1,1),
-	id_persona					int NOT NULL,
-	es_responsable				bit default 0,
-	relacion_con_responsable	varchar(20) NOT NULL,
-	primary key (id, id_persona),
-	foreign key (id_persona) references socio.persona(id)
+	id				int primary key identity(1,1),
+	id_socio		int NOT NULL UNIQUE,
+	f_inscripcion	date NOT NULL,
+	foreign key (id_socio) references socio.socio(id)
 );
-go
 ---------------------------------------------------------------------------
 ---------------------------- FIN TABLAS SOCIO -----------------------------
 ---------------------------------------------------------------------------
 
-
 ---------------------------------------------------------------------------
--------------------- TABLAS CUENTA ACCESO Y EMPLEADO ----------------------
+-------------------- TABLA EMPLEADO ----------------------
 ---------------------------------------------------------------------------
--- Rol
-create table general.rol
-(
-	id				int primary key identity(1,1),
-	descripcion		varchar(100) NOT NULL
-);
-
--- Puesto
-create table empleado.puesto
-(
-	id 			int primary key identity(1,1),
-	descripcion	varchar(100) NOT NULL
-);
 
 -- Empleado
-create table empleado.empleado
+create table general.empleado
 (
 	id			int primary key identity(1,1),
 	nombre		varchar(50) NOT NULL,
-	apellido	varchar(50) NOT NULL,
-	dni			int UNIQUE NOT NULL CHECK(dni > 0),
-	email		varchar(254) NOT NULL CHECK(email like '_%@_%._%'),
-	id_puesto	int NOT NULL,
-	foreign key (id_puesto) references empleado.puesto(id)
 );
-
--- Cuenta Acceso
-create table general.cuenta_acceso
-(
-	id						int primary key identity(1,1),
-	usuario					varchar(50) NOT NULL,
-	hash_contraseña			varchar(50) NOT NULL,
-	vigencia_contraseña		date NOT NULL,
-	id_rol					int NOT NULL,
-	id_persona				int,
-	id_empleado				int,
-	foreign key (id_rol) references general.rol(id),
-	foreign key (id_persona) references socio.persona(id),
-	foreign key (id_empleado) references empleado.empleado(id)
-);
-go
-
----------------------------------------------------------------------------
------------------------ TABLAS INVITADO Y PILETA --------------------------
----------------------------------------------------------------------------
--- Invitado
-create table socio.invitado
-(
-	id						int primary key identity(1,1),
-	nombre					varchar(50) NOT NULL,
-	apellido				varchar(50) NOT NULL,
-	dni						int UNIQUE NOT NULL CHECK(dni > 0),
-	id_persona_asociada		int NOT NULL,
-	foreign key (id_persona_asociada) references socio.persona(id)
-);
-
--- Tarifa Pileta
-create table socio.tarifa_pileta
-(
-	id		int primary key identity(1,1),
-	tipo	varchar(50) COLLATE modern_spanish_CI_AS CHECK(tipo IN('Socio','Invitado')),
-	precio	decimal(8,2) NOT NULL check(precio >= 0)
-);
-
--- Registro Pileta
-create table socio.registro_pileta
-(
-	id				int primary key identity(1,1),
-	id_persona		int,
-	id_invitado 	int,
-	fecha			date NOT NULL,
-	id_tarifa		int NOT NULL,
-	foreign key (id_persona) references socio.persona(id),
-	foreign key (id_invitado) references socio.invitado(id),
-	foreign key (id_tarifa) references socio.tarifa_pileta(id)
-);
-go
----------------------------------------------------------------------------
----------------------- FIN TABLAS INVITADO Y PILETA -----------------------
----------------------------------------------------------------------------
-
 
 ---------------------------------------------------------------------------
 ----------------------- TABLAS INSCRIPCION Y CLASE ------------------------
@@ -185,13 +123,6 @@ create table socio.categoria
 	edad_max	int NOT NULL 
 );
 
--- Estado Inscripcion
-create table socio.estado_inscripcion
-(
-	id		int primary key identity(1,1),
-	estado	varchar(50) NOT NULL
-);
-
 -- Medio de Pago
 create table socio.medio_de_pago
 (
@@ -200,26 +131,62 @@ create table socio.medio_de_pago
 );
 
 -- Inscripcion
-create table socio.inscripcion
+create table socio.cuota
 (
 	id					int primary key identity(1,1),
-	numero_socio		varchar(10) CHECK(numero_socio like 'SN-_%'),
-	id_persona			int NOT NULL,
-	id_grupo_familiar	int,
-	fecha_inicio		datetime NOT NULL,
-	fecha_baja			datetime,
-	id_estado			int NOT NULL,
+	id_socio			int NOT NULL,
 	id_categoria		int NOT NULL,
 	id_medio_pago		int NOT NULL,
-	foreign key (id_persona) references socio.persona(id),
-	foreign key (id_grupo_familiar,id_persona) references socio.grupo_familiar(id,id_persona),
-	foreign key (id_estado) references socio.estado_inscripcion(id),
+	monto_total			decimal(8,2),
+	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_categoria) references socio.categoria(id),
 	foreign key (id_medio_pago) references socio.medio_de_pago(id)
 );
 go
 ---------------------------------------------------------------------------
 --------------------- FIN TABLAS INSCRIPCION Y CLASE ----------------------
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+----------------------- TABLAS INVITADO Y PILETA --------------------------
+---------------------------------------------------------------------------
+-- Invitado
+create table socio.invitado
+(
+	id						int primary key identity(1,1),
+	nombre					varchar(50) NOT NULL,
+	apellido				varchar(50) NOT NULL,
+	dni						int UNIQUE NOT NULL CHECK(dni > 0),
+	email					varchar(254) CHECK(email like '_%@_%._%'),
+	id_socio_asociado		int NOT NULL,
+	foreign key (id_socio_asociado) references socio.socio(id)
+);
+
+-- Tarifa Pileta
+create table socio.tarifa_pileta
+(
+	id		int primary key identity(1,1),
+	tipo	varchar(50) COLLATE modern_spanish_CI_AS CHECK(tipo IN('Socio','Invitado')),
+	precio	decimal(8,2) NOT NULL check(precio >= 0)
+);
+
+-- Registro Pileta
+create table socio.registro_pileta
+(
+	id				int primary key identity(1,1),
+	id_socio		int,
+	id_invitado 	int,
+	fecha			date NOT NULL,
+	id_tarifa		int NOT NULL,
+	id_medio_de_pago	int NOT NULL,
+	foreign key (id_medio_de_pago) references socio.medio_de_pago(id),
+	foreign key (id_socio) references socio.socio(id),
+	foreign key (id_invitado) references socio.invitado(id),
+	foreign key (id_tarifa) references socio.tarifa_pileta(id)
+);
+go
+---------------------------------------------------------------------------
+---------------------- FIN TABLAS INVITADO Y PILETA -----------------------
 ---------------------------------------------------------------------------
 
 
@@ -237,29 +204,23 @@ create table general.actividad
 -- Actividad Extra
 create table general.actividad_extra
 (
-	id		int primary key identity(1,1),
-	nombre	varchar(50) NOT NULL,
-	costo	decimal(8,2) NOT NULL
+	id					int primary key identity(1,1),
+	nombre				varchar(50) NOT NULL,
+	costo				decimal(8,2) NOT NULL,
+	id_medio_de_pago	int NOT NULL,
+	foreign key (id_medio_de_pago) references socio.medio_de_pago(id)
 );
 
--- Dia Semana
-create table general.dia_semana
-(
-	id		int primary key identity(1,1),
-	nombre	varchar(50) NOT NULL
-);
 
 -- Inscripcion Actividad
 create table socio.inscripcion_actividad
 (
 	id					int primary key identity(1,1),
-	id_inscripcion		int NOT NULL,
-	id_actividad		int,
-	id_actividad_extra	int,
-	fecha_inscripcion	datetime NOT NULL,
-	foreign key (id_inscripcion) references socio.inscripcion(id),
+	id_cuota			int NOT NULL,
+	id_actividad		int NOT NULL,
+	fecha_inscripcion	datetime NOT NULL,	
+	foreign key (id_cuota) references socio.cuota(id),
 	foreign key (id_actividad) references general.actividad(id),
-	foreign key (id_actividad_extra) references general.actividad_extra(id)
 );
 
 -- Clase
@@ -270,14 +231,22 @@ create table general.clase
 	hora_fin		time NOT NULL,
 	id_categoria	int NOT NULL,
 	id_actividad	int NOT NULL,
-	id_dia_semana	int NOT NULL,
 	id_empleado		int NOT NULL,
 	foreign key (id_actividad) references general.actividad(id),
 	foreign key (id_categoria) references socio.categoria(id),
-	foreign key (id_empleado) references empleado.empleado(id),
-	foreign key (id_dia_semana) references general.dia_semana(id)
+	foreign key (id_empleado) references general.empleado(id),
 );
 go
+
+create table general.presentismo
+(
+	id				int primary key identity(1,1),
+	id_socio		int,
+	id_clase		int,
+	fecha			datetime,
+	foreign key (id_socio) references socio.socio(id),
+	foreign key (id_clase) references general.clase(id)
+)
 ---------------------------------------------------------------------------
 ---------------------- FIN TABLAS CLASE / ACTIVIDAD -----------------------
 ---------------------------------------------------------------------------
@@ -287,23 +256,16 @@ go
 ------------------------- TABLAS PAGO Y FACTURA ---------------------------
 ---------------------------------------------------------------------------
 -- Cuenta Corriente
-create table socio.cuenta_corriente
+create table socio.estado_cuenta
 (
 	id			int primary key identity(1,1),
-	id_persona	int NOT NULL,
+	id_socio	int NOT NULL,
 	saldo		decimal(8,2),
-	foreign key (id_persona) references socio.persona(id)
+	foreign key (id_socio) references socio.socio(id)
 );
 
--- Estado Factura
-create table socio.estado_factura 
-(
-	id				int primary key identity(1,1),
-	descripcion		varchar(50) NOT NULL
-);
-
--- Factura
-create table socio.factura
+-- Factura cuouta
+create table socio.factura_cuota
 (
 	id						int primary key identity(1,1),
 	fecha_generacion		date NOT NULL,
@@ -311,22 +273,45 @@ create table socio.factura
 	fecha_vencimiento_2		date NOT NULL,
 	monto					decimal(8,2),
 	descripcion				varchar(100) NOT NULL,
-	id_inscripcion			int,
+	id_cuota				int,
 	id_registro_pileta		int,
-	id_estado_factura		int NOT NULL,
-	foreign key (id_inscripcion) references socio.inscripcion(id),
+	foreign key (id_cuota) references socio.cuota(id),
 	foreign key (id_registro_pileta) references socio.registro_pileta(id),
-	foreign key (id_estado_factura) references socio.estado_factura(id)
 );
-
--- Item Factura
-create table socio.item_factura
+-- Item Factura cuota
+create table socio.item_factura_cuota
 (
 	id			int primary key identity(1,1),
 	id_factura 	int NOT NULL,
 	monto		decimal(8,2) NOT NULL,
 	tipo_item	varchar(50) NOT NULL,
-	foreign key (id_factura) references socio.factura(id)
+	foreign key (id_factura) references socio.factura_cuota(id)
+);
+
+-- Factura extra
+create table socio.factura_extra
+(
+	id						int primary key identity(1,1),
+	fecha_generacion		date NOT NULL,
+	fecha_vencimiento_1		date NOT NULL,
+	fecha_vencimiento_2		date NOT NULL,
+	monto					decimal(8,2),
+	descripcion				varchar(100) NOT NULL,
+	id_actividad_extra		int,
+	id_registro_pileta		int,
+	
+	foreign key (id_actividad_extra) references general.actividad_extra(id),
+	foreign key (id_registro_pileta) references socio.registro_pileta(id),
+);
+
+-- Item Factura extra
+create table socio.item_factura_extra
+(
+	id			int primary key identity(1,1),
+	id_factura 	int NOT NULL,
+	monto		decimal(8,2) NOT NULL,
+	tipo_item	varchar(50) NOT NULL,
+	foreign key (id_factura) references socio.factura_extra(id)
 );
 
 -- Pago
@@ -336,8 +321,10 @@ create table socio.pago
 	fecha_pago				date NOT NULL,
 	monto					decimal(8,2) NOT NULL,
 	es_debito_automatico	bit default 0,
-	id_factura				int NOT NULL,
-	foreign key (id_factura) references socio.factura(id)
+	id_factura_cuota		int,
+	id_factura_extra		int,
+	foreign key (id_factura_cuota) references socio.factura_cuota(id),
+	foreign key (id_factura_extra) references socio.factura_extra(id)
 );
 
 -- Tipo Reembolso
@@ -364,14 +351,14 @@ create table socio.reembolso
 create table socio.movimiento_cuenta
 (
 	id						int primary key identity (1,1),
-	id_cuenta_corriente		int NOT NULL,
+	id_estado_cuenta		int NOT NULL,
 	fecha					datetime NOT NULL,
 	monto					decimal(8,2) NOT NULL,
-	id_factura				int,
-	id_pago					int,
-	id_reembolso			int,
-	foreign key (id_cuenta_corriente) references socio.cuenta_corriente(id),
-	foreign key (id_factura) references socio.factura(id),
+	id_factura				int NOT NULL,
+	id_pago					int NOT NULL,
+	id_reembolso			int NOT NULL,
+	foreign key (id_estado_cuenta) references socio.estado_cuenta(id),
+	foreign key (id_factura) references socio.factura_cuota(id),
 	foreign key (id_pago) references socio.pago(id),
 	foreign key (id_reembolso) references socio.reembolso(id)
 );
@@ -460,7 +447,7 @@ begin
     end
 
     -- Validar que no esté siendo usada en otra tabla
-    if exists (select 1 from socio.obra_social_persona where id_datos_os = @id)
+    if exists (select 1 from socio.obra_social_socio where id_datos_os = @id)
     begin
         print 'No se puede eliminar la obra social porque está vinculada a una persona.';
         return;
@@ -497,7 +484,7 @@ begin
     end
 
     -- Insertar la obra social de la persona
-    insert into socio.obra_social_persona (id_datos_os, numero_socio)
+    insert into socio.obra_social_socio (id_datos_os, numero_socio)
     values (@id_datos_os, @numero_socio);
 end
 go
@@ -509,7 +496,7 @@ create or alter procedure socio.actualizarObraSocialPersona
 as
 begin
     -- Validar existencia del registro a actualizar
-    if not exists (select 1 from socio.obra_social_persona where id = @id)
+    if not exists (select 1 from socio.obra_social_socio where id = @id)
     begin
         print 'No existe una obra social persona con ese ID.';
         return;
@@ -529,7 +516,7 @@ begin
     end
 
     -- Actualizar la obra social de la persona
-    update socio.obra_social_persona
+    update socio.obra_social_socio
     set id_datos_os = @nuevo_id_datos_os,
         numero_socio = @nuevo_numero_socio
     where id = @id;
@@ -541,21 +528,21 @@ create or alter procedure socio.eliminarObraSocialPersona
 as
 begin
     -- Validar existencia del registro a eliminar
-    if not exists (select 1 from socio.obra_social_persona where id = @id)
+    if not exists (select 1 from socio.obra_social_socio where id = @id)
     begin
         print 'No existe una obra social persona con ese ID.';
         return;
     end
 
     -- Validar que no esté vinculada a una persona
-    if exists (select 1 from socio.persona where id_obra_social_persona = @id)
+    if exists (select 1 from socio.socio where id_obra_social_socio = @id)
     begin
         print 'No se puede eliminar porque está vinculada a una persona.';
         return;
     end
 
     -- Eliminar la obra social de la persona
-    delete from socio.obra_social_persona where id = @id;
+    delete from socio.obra_social_socio where id = @id;
 end
 go
 /*************************************************************************/
@@ -566,7 +553,7 @@ go
 /***************************** INICIO PERSONA ****************************/
 /*************************************************************************/
 -- INSERT
-create or alter procedure socio.agregarPersona
+create or alter procedure socio.agregarSocio
     @nombre                 varchar(50),
     @apellido               varchar(50),
     @dni                    int,
@@ -595,8 +582,8 @@ begin
         begin transaction;
 
         -- Insertar persona
-        insert into socio.persona
-            (nombre, apellido, dni, email, fecha_nacimiento, telefono, telefono_emergencia, id_obra_social_persona)
+        insert into socio.socio
+            (nombre, apellido, dni, email, fecha_nacimiento, telefono, telefono_emergencia, id_obra_social_socio)
         values
             (@nombre, @apellido, @dni, @email, @fecha_nacimiento, @telefono, @telefono_emergencia, @id_obra_social_persona);
 
@@ -632,7 +619,7 @@ create or alter procedure socio.actualizarPersona
     @id_obra_social_persona int = null
 as
 begin
-    if not exists (select 1 from socio.persona where id = @id)
+    if not exists (select 1 from socio.socio where id = @id)
     begin
         print 'No existe una persona con el ID especificado.'
         return;
@@ -644,13 +631,13 @@ begin
         return;
     end
 
-    update socio.persona
+    update socio.socio
     set nombre = @nombre,
         apellido = @apellido,
         email = @email,
         telefono = @telefono,
         telefono_emergencia = @telefono_emergencia,
-        id_obra_social_persona = @id_obra_social_persona
+        id_obra_social_socio = @id_obra_social_persona
     where id = @id
 
     print 'Persona actualizada correctamente.'
@@ -674,7 +661,7 @@ create or alter procedure socio.agregarGrupoFamiliar
 as
 begin
     -- Validar que exista la persona
-    if not exists (select 1 from socio.persona where id = @id_persona)
+    if not exists (select 1 from socio.socio where id = @id_persona)
     begin
         print 'No existe una persona con el ID especificado.'
         return;
@@ -746,6 +733,7 @@ begin
     print 'Miembro del grupo familiar eliminado correctamente.'
 end
 go
+
 /*************************************************************************/
 /*************************** FIN GRUPO FAMILIAR **************************/
 /*************************************************************************/
@@ -762,7 +750,7 @@ create or alter procedure socio.agregarInvitado
 as
 begin
     -- Validar que la persona asociada exista
-    if not exists (select 1 from socio.persona where id = @id_persona_asociada)
+    if not exists (select 1 from socio.socio where id = @id_persona_asociada)
     begin
         print 'No existe una persona asociada con ese ID.'
         return;
@@ -782,7 +770,7 @@ begin
         return;
     end
 
-    insert into socio.invitado (nombre, apellido, dni, id_persona_asociada)
+    insert into socio.invitado (nombre, apellido, dni, id_socio_asociado)
     values (@nombre, @apellido, @dni, @id_persona_asociada)
 
     print 'Invitado agregado correctamente.'
@@ -806,7 +794,7 @@ begin
     end
 
     -- Validar que la persona asociada exista
-    if not exists (select 1 from socio.persona where id = @id_persona_asociada)
+    if not exists (select 1 from socio.socio where id = @id_persona_asociada)
     begin
         print 'No existe una persona asociada con ese ID.'
         return;
@@ -830,7 +818,7 @@ begin
     set nombre = @nombre,
         apellido = @apellido,
         dni = @dni,
-        id_persona_asociada = @id_persona_asociada
+        id_socio_asociado = @id_persona_asociada
     where id = @id
 
     print 'Invitado actualizado correctamente.'
@@ -965,7 +953,7 @@ begin
     -- Validar persona si está presente
     if (@id_persona is not null)
     begin
-        if not exists (select 1 from socio.persona where id = @id_persona)
+        if not exists (select 1 from socio.socio where id = @id_persona)
         begin
             print 'No existe persona con ese ID.'
             return;
@@ -989,7 +977,7 @@ begin
         return;
     end
 
-    insert into socio.registro_pileta (id_persona, id_invitado, fecha, id_tarifa)
+    insert into socio.registro_pileta (id_socio, id_invitado, fecha, id_tarifa)
     values (@id_persona, @id_invitado, @fecha, @id_tarifa)
 
     print 'Registro pileta agregado correctamente.'
@@ -1028,7 +1016,7 @@ begin
     -- Validar persona si está presente
     if (@id_persona is not null)
     begin
-        if not exists (select 1 from socio.persona where id = @id_persona)
+        if not exists (select 1 from socio.socio where id = @id_persona)
         begin
             print 'No existe persona con ese ID.'
             return;
@@ -1054,7 +1042,7 @@ begin
 
     -- Realizar actualización
     update socio.registro_pileta
-    set id_persona = @id_persona,
+    set id_socio = @id_persona,
         id_invitado = @id_invitado,
         fecha = @fecha,
         id_tarifa = @id_tarifa
@@ -1338,7 +1326,7 @@ begin
     end
 
     -- Validar que no haya inscripciones usando este medio de pago
-    if exists (select 1 from socio.inscripcion where id_medio_pago = @id)
+    if exists (select 1 from socio.membresia where id_medio_pago = @id)
     begin
         print 'No se puede eliminar el medio de pago porque está asociado a inscripciones.'
         return;
@@ -1376,7 +1364,7 @@ begin
     end
 
     -- Validar que no exista una inscripción con el mismo número de socio
-    if exists (select 1 from socio.inscripcion where numero_socio = @numero_socio)
+    if exists (select 1 from socio.membresia where numero_socio = @numero_socio)
     begin
         print 'Ya existe una inscripción con ese número de socio.'
         return;
@@ -1526,7 +1514,7 @@ create or alter procedure socio.insertarInscripcionActividad
 as
 begin
     -- Validar que exista la inscripción
-    if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
+    if not exists (select 1 from socio.membresia where id = @id_inscripcion)
     begin
         print 'No existe una inscripción con ese ID.'
         return;
@@ -1553,7 +1541,7 @@ begin
         return;
     end
 
-    insert into socio.inscripcion_actividad (id_inscripcion, id_actividad, id_actividad_extra, fecha_inscripcion)
+    insert into socio.inscripcion_actividad (id_membresia, id_actividad, id_actividad_extra, fecha_inscripcion)
     values (@id_inscripcion, @id_actividad, @id_actividad_extra, @fecha_inscripcion)
 
     print 'Inscripción a actividad creada correctamente.'
@@ -1577,7 +1565,7 @@ begin
     end
 
     -- Validar que exista la inscripción
-    if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
+    if not exists (select 1 from socio.membresia where id = @id_inscripcion)
     begin
         print 'No existe una inscripción con ese ID.'
         return;
@@ -1605,7 +1593,7 @@ begin
     end
 
     update socio.inscripcion_actividad
-    set id_inscripcion = @id_inscripcion,
+    set id_membresia = @id_inscripcion,
         id_actividad = @id_actividad,
         id_actividad_extra = @id_actividad_extra,
         fecha_inscripcion = @fecha_inscripcion
@@ -1646,21 +1634,21 @@ create or alter procedure socio.insertarCuentaCorriente
 as
 begin
     -- Validar que la persona exista
-    if not exists (select 1 from socio.persona where id = @id_persona)
+    if not exists (select 1 from socio.socio where id = @id_persona)
     begin
         print 'No existe la persona indicada.'
         return;
     end
 
     -- Validar que la persona no tenga ya una cuenta corriente (asumiendo relación 1 a 1)
-    if exists (select 1 from socio.cuenta_corriente where id_persona = @id_persona)
+    if exists (select 1 from socio.cuenta_corriente where id_socio = @id_persona)
     begin
         print 'La persona ya tiene una cuenta corriente asociada.'
         return;
     end
 
     -- Insertar cuenta corriente
-    insert into socio.cuenta_corriente (id_persona, saldo)
+    insert into socio.cuenta_corriente (id_socio, saldo)
     values (@id_persona, @saldo)
 
     print 'Cuenta corriente insertada correctamente.'
@@ -1676,8 +1664,8 @@ begin
     -- Validar que la cuenta exista
     if not exists (select 1 from socio.cuenta_corriente where id = @id)
     begin
-        print 'No existe una cuenta corriente con ese ID.';
-        throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+        print 'No existe una cuenta corriente con ese ID.'
+        return;
     end
 
     -- Actualizar saldo
@@ -1775,10 +1763,10 @@ go
 /*************************************************************************/
 
 /*************************************************************************/
-/***************** INICIO FACTURA CON ITEMS - PERSONA ********************/
+/********************** INICIO FACTURA CON ITEMS *************************/
 /*************************************************************************/
 -- INSERT
-create or alter procedure socio.insertarFacturaCompletaPersona
+create or alter procedure socio.insertarFacturaCompleta
     @fecha_generacion date,
     @fecha_vencimiento_1 date,
     @fecha_vencimiento_2 date,
@@ -1793,7 +1781,6 @@ begin
     declare @monto_total decimal(8,2) = 0;
     declare @id_factura int;
 	declare @id_cuenta_corriente int;
-    declare @fecha datetime = getdate();
 
     -- Validaciones básicas
 
@@ -1811,7 +1798,7 @@ begin
 
     if @id_inscripcion is not null
     begin
-        if not exists (select 1 from socio.inscripcion where id = @id_inscripcion)
+        if not exists (select 1 from socio.membresia where id = @id_inscripcion)
         begin
             print 'Error: No existe la inscripción indicada.';
             return;
@@ -1847,37 +1834,18 @@ begin
         begin
             declare @costo_categoria decimal(8,2) = 0;
             select @costo_categoria = c.costo
-            from socio.inscripcion i
+            from socio.membresia i
             join socio.categoria c on i.id_categoria = c.id
             where i.id = @id_inscripcion;
 
             set @monto_total += isnull(@costo_categoria,0);
 
-            -- Si es parte del grupo familiar, le hacemos un descuento del 15% a su membresia
-            declare @id_grupo_familiar int;
-            select @id_grupo_familiar = i.id_grupo_familiar
-            from socio.factura f
-            join socio.inscripcion i on f.id_inscripcion = i.id
-            where f.id_inscripcion = @id_inscripcion;
-            
-            if @id_grupo_familiar is not null
-            begin
-                set @monto_total = @monto_total * 0.85;
-            end
-
             -- Sumar costos de actividades
             declare @monto_actividades decimal(8,2) = 0;
-            declare @cantidad_actividades int = 0;
-            select @monto_actividades = isnull(sum(a.costo),0), @cantidad_actividades = count(*)
+            select @monto_actividades = isnull(sum(a.costo),0)
             from socio.inscripcion_actividad ia
-            join general.actividad a on ia.id_actividad = a.id
-            where ia.id_inscripcion = @id_inscripcion;
-
-            -- Si hay mas de una actividad deportiva, le hacemos el 10% de descuento sobre el total de las actividades deportivas
-            if @cantidad_actividades > 1
-            begin
-                set @monto_actividades = @monto_actividades * 0.9;
-            end
+            join socio.actividad a on ia.id_actividad = a.id
+            where ia.id_membresia = @id_inscripcion;
 
             set @monto_total += @monto_actividades;
 
@@ -1885,8 +1853,8 @@ begin
             declare @monto_actividades_extra decimal(8,2) = 0;
             select @monto_actividades_extra = isnull(sum(ae.costo),0)
             from socio.inscripcion_actividad ia
-            join general.actividad_extra ae on ia.id_actividad_extra = ae.id
-            where ia.id_inscripcion = @id_inscripcion
+            join socio.actividad_extra ae on ia.id_actividad_extra = ae.id
+            where ia.id_membresia = @id_inscripcion
               and ia.id_actividad_extra is not null;
 
             set @monto_total += @monto_actividades_extra;
@@ -1896,20 +1864,16 @@ begin
         if @id_registro_pileta is not null
         begin
             declare @costo_pileta decimal(8,2) = 0;
-
-            -- Buscamos el precio
-            select @costo_pileta = tp.precio
-            from socio.registro_pileta rp
-            inner join socio.tarifa_pileta tp
-                on rp.id_tarifa = tp.id
-            where rp.id = @id_registro_pileta;
+            select @costo_pileta = costo
+            from socio.registro_pileta
+            where id = @id_registro_pileta;
 
             set @monto_total += isnull(@costo_pileta,0);
         end
 
         -- Insertar factura con monto total calculado
         insert into socio.factura
-            (fecha_generacion, fecha_vencimiento_1, fecha_vencimiento_2, monto, descripcion, id_inscripcion, id_registro_pileta, id_estado_factura)
+            (fecha_generacion, fecha_vencimiento_1, fecha_vencimiento_2, monto, descripcion, id_membresia, id_registro_pileta, id_estado_factura)
         values
             (@fecha_generacion, @fecha_vencimiento_1, @fecha_vencimiento_2, @monto_total, @descripcion, @id_inscripcion, @id_registro_pileta, @id_estado_factura);
 
@@ -1918,8 +1882,8 @@ begin
 		-- Obtener cuenta corriente
 		select @id_cuenta_corriente = id
 		from socio.cuenta_corriente
-		where id_persona in (
-			select id_persona
+		where id_socio in (
+			select id_socio
 			from socio.inscripcion
 			where id = @id_inscripcion
 		);
@@ -1934,8 +1898,8 @@ begin
 		-- Insertamos el movimiento en la cuenta
 		exec socio.insertarMovimientoCuenta
 			@id_cuenta_corriente = @id_cuenta_corriente,
-			@fecha = @fecha,
-			@monto = @monto_total,
+			@fecha = getdate(),
+			@monto = -@monto_total,
 			@id_factura = @id_factura,
 			@id_pago = null,
 			@id_reembolso = null;
@@ -1947,7 +1911,7 @@ begin
             -- Insertar categoría
             insert into socio.item_factura (id_factura, monto, tipo_item)
             select @id_factura, c.costo, 'Categoría'
-            from socio.inscripcion i
+            from socio.membresia i
             join socio.categoria c on i.id_categoria = c.id
             where i.id = @id_inscripcion;
 
@@ -1955,24 +1919,25 @@ begin
             insert into socio.item_factura (id_factura, monto, tipo_item)
             select @id_factura, a.costo, 'Actividad'
             from socio.inscripcion_actividad ia
-            join general.actividad a on ia.id_actividad = a.id
-            where ia.id_inscripcion = @id_inscripcion;
+            join socio.actividad a on ia.id_actividad = a.id
+            where ia.id_membresia = @id_inscripcion;
 
             -- Insertar actividades extras
             insert into socio.item_factura (id_factura, monto, tipo_item)
             select @id_factura, ae.costo, 'Actividad Extra'
             from socio.inscripcion_actividad ia
-            join general.actividad_extra ae on ia.id_actividad_extra = ae.id
-            where ia.id_inscripcion = @id_inscripcion
+            join socio.actividad_extra ae on ia.id_actividad_extra = ae.id
+            where ia.id_membresia = @id_inscripcion
               and ia.id_actividad_extra is not null;
         end
 
         if @id_registro_pileta is not null
         begin
             insert into socio.item_factura (id_factura, monto, tipo_item)
-            select @id_factura, @costo_pileta, 'Uso de Pileta'
+            select @id_factura, costo, 'Uso de Pileta'
             from socio.registro_pileta
-            where id = @id_registro_pileta;
+            where id = @id_registro_pileta
+              and costo > 0;
         end
 
         commit transaction;
@@ -1995,111 +1960,7 @@ go
 -- DELETE
 -- No permitido en el sistema
 /*************************************************************************/
-/******************* FIN FACTURA CON ITEMS - PERSONA *********************/
-/*************************************************************************/
-
-/*************************************************************************/
-/***************** INICIO FACTURA CON ITEMS - INVITADO *******************/
-/*************************************************************************/
--- INSERT
-create or alter procedure socio.insertarFacturaCompletaInvitado
-    @fecha_generacion date,
-    @fecha_vencimiento_1 date,
-    @fecha_vencimiento_2 date,
-    @descripcion varchar(100),
-    @id_registro_pileta int,
-    @id_estado_factura int
-as
-begin
-    set nocount on;
-
-    declare @monto_total decimal(8,2) = 0;
-    declare @id_factura int;
-
-    -- Validaciones
-    if @id_registro_pileta is null
-    begin
-        print 'Error: Debe indicar un registro de pileta para el invitado.';
-        return;
-    end
-
-    if not exists (select 1 from socio.registro_pileta where id = @id_registro_pileta)
-    begin
-        print 'Error: No existe el registro de pileta indicado.';
-        return;
-    end
-
-    -- Validar que sea invitado (id_invitado no debe ser null)
-    if not exists (select 1 from socio.registro_pileta where id = @id_registro_pileta and id_invitado is not null)
-    begin
-        print 'Error: El registro de pileta no corresponde a un invitado.';
-        return;
-    end
-
-    if not exists (select 1 from socio.estado_factura where id = @id_estado_factura)
-    begin
-        print 'Error: No existe el estado de factura indicado.';
-        return;
-    end
-
-    if @fecha_vencimiento_1 < @fecha_generacion
-    begin
-        print 'Error: La primera fecha de vencimiento no puede ser anterior a la fecha de generación.';
-        return;
-    end
-
-    if @fecha_vencimiento_2 < @fecha_vencimiento_1
-    begin
-        print 'Error: La segunda fecha de vencimiento no puede ser anterior a la primera fecha de vencimiento.';
-        return;
-    end
-
-    begin try
-        begin transaction;
-
-        -- Calcular costo de registro de pileta
-        declare @costo_pileta decimal(8,2) = 0;
-
-        select @costo_pileta = tp.precio
-        from socio.registro_pileta rp
-        inner join socio.tarifa_pileta tp on rp.id_tarifa = tp.id
-        where rp.id = @id_registro_pileta;
-
-        set @monto_total = isnull(@costo_pileta, 0);
-
-        -- Insertar factura (sin id_inscripcion)
-        insert into socio.factura
-            (fecha_generacion, fecha_vencimiento_1, fecha_vencimiento_2, monto, descripcion, id_inscripcion, id_registro_pileta, id_estado_factura)
-        values
-            (@fecha_generacion, @fecha_vencimiento_1, @fecha_vencimiento_2, @monto_total, @descripcion, null, @id_registro_pileta, @id_estado_factura);
-
-        set @id_factura = scope_identity();
-
-        -- Insertar ítem de uso de pileta
-        insert into socio.item_factura (id_factura, monto, tipo_item)
-        values (@id_factura, @costo_pileta, 'Uso de Pileta');
-
-        commit transaction;
-
-        print 'Factura de invitado insertada correctamente.';
-
-    end try
-    begin catch
-        rollback transaction;
-        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
-        print 'Error al insertar factura de invitado: ' + @ErrorMessage;
-        return;
-    end catch
-end
-go
-
--- UPDATE
--- No permitido en el sistema
-
--- DELETE
--- No permitido en el sistema
-/*************************************************************************/
-/****************** FIN FACTURA CON ITEMS - INVITADO *********************/
+/************************ FIN FACTURA CON ITEMS **************************/
 /*************************************************************************/
 
 /*************************************************************************/
@@ -2116,9 +1977,6 @@ begin
 	set nocount on;
 
 	declare @id_cuenta_corriente int;
-    declare @fecha datetime = getdate();
-    declare @id_registro_pileta int;
-    declare @id_invitado int;
 
     -- Validación de monto mayor a 0
     if @monto <= 0
@@ -2141,53 +1999,25 @@ begin
 		insert into socio.pago (fecha_pago, monto, es_debito_automatico, id_factura)
 		values (@fecha_pago, @monto, @es_debito_automatico, @id_factura);
 
-        declare @id_pago int;
-        set @id_pago = scope_identity();
+		-- Obtener cuenta corriente
+		select @id_cuenta_corriente = cc.id
+		from socio.cuenta_corriente cc
+		inner join socio.membresia i on cc.id_socio = i.id_socio
+		inner join socio.factura f on f.id_membresia = i.id
+		where f.id = @id_factura;
 
-        -- Verificar si es invitado
-        select @id_registro_pileta = id_registro_pileta
-        from socio.factura
-        where id = @id_factura;
+		-- Insertamos el movimiento en la cuenta
+		exec socio.insertarMovimientoCuenta
+			@id_cuenta_corriente = @id_cuenta_corriente,
+			@fecha = getdate(),
+			@monto = -@monto_total,
+			@id_factura = @id_factura,
+			@id_pago = null,
+			@id_reembolso = null;
+		
+		commit transaction;
 
-        if @id_registro_pileta is not null
-        begin
-            select @id_invitado = id_invitado
-            from socio.registro_pileta
-            where id = @id_registro_pileta;
-        end
-
-        if @id_invitado is null
-        begin
-            -- Obtener cuenta corriente
-            select @id_cuenta_corriente = cc.id
-            from socio.cuenta_corriente cc
-            inner join socio.inscripcion i on cc.id_persona = i.id_persona
-            inner join socio.factura f on f.id_inscripcion = i.id
-            where f.id = @id_factura;
-
-            if @id_cuenta_corriente is null
-            begin
-                print 'No se encontró cuenta corriente para la persona asociada.';
-                rollback transaction;
-            end
-
-            -- Insertamos el movimiento en la cuenta
-            exec socio.insertarMovimientoCuenta
-                @id_cuenta_corriente = @id_cuenta_corriente,
-                @fecha = @fecha,
-                @monto = @monto,
-                @id_factura = null,
-                @id_pago = @id_pago,
-                @id_reembolso = null;
-        end
-        else
-        begin
-            print 'El pago corresponde a un invitado, no se actualiza cuenta corriente.';
-        end
-
-        commit transaction;
-
-        print 'Pago insertado correctamente.'
+		print 'Pago insertado correctamente.'
 
 	end try
 	begin catch
@@ -2223,8 +2053,7 @@ begin
     set nocount on;
 
 	declare @id_cuenta_corriente int;
-    declare @fecha datetime = getdate();
-
+	declare @id_reembolso int;
     -- Validar que exista el pago asociado
     if not exists (select 1 from socio.pago where id = @id_pago)
     begin
@@ -2266,27 +2095,25 @@ begin
 		-- Insertar el reembolso
 		insert into socio.reembolso (id_pago, monto, fecha_reembolso, motivo, id_tipo_reembolso)
 		values (@id_pago, @monto, @fecha_reembolso, @motivo, @id_tipo_reembolso);
-
-		declare @id_reembolso int;
+		
 		set @id_reembolso = scope_identity();
-
 		-- Obtener cuenta corriente
 		select @id_cuenta_corriente = cc.id
 		from socio.reembolso r
 		join socio.pago p on r.id_pago = p.id
 		join socio.factura f on p.id_factura = f.id
-		join socio.inscripcion i on f.id_inscripcion = i.id
-		join socio.cuenta_corriente cc on i.id_persona = cc.id_persona
+		join socio.membresia i on f.id_membresia = i.id
+		join socio.cuenta_corriente cc on i.id_socio = cc.id_socio
 		where r.id = @id_reembolso;
 
 		-- Insertamos el movimiento en la cuenta
 		exec socio.insertarMovimientoCuenta
 			@id_cuenta_corriente = @id_cuenta_corriente,
-			@fecha = @fecha,
-			@monto = @monto,
-			@id_factura = null,
+			@fecha = getdate(),
+			@monto = -@monto_total,
+			@id_factura = @id_factura,
 			@id_pago = null,
-			@id_reembolso = @id_reembolso;
+			@id_reembolso = null;
 
 		commit transaction;
 
@@ -2417,27 +2244,27 @@ go
 create or alter procedure socio.insertarMovimientoCuenta
     @id_cuenta_corriente int,
     @fecha datetime,
-    @monto decimal(8,2),
     @id_factura int = null,
     @id_pago int = null,
     @id_reembolso int = null
 as
 begin
+    declare @monto decimal(8,2)
 	declare @montoAux decimal(8,2)
 	declare @descripcionTipoReembolso varchar(50);
 
     -- Validar que la cuenta corriente exista
     if not exists (select 1 from socio.cuenta_corriente where id = @id_cuenta_corriente)
     begin
-        print 'No existe la cuenta corriente indicada.';
-        throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+        print 'No existe la cuenta corriente indicada.'
+        return;
     end
 
     -- Validar que al menos uno sea informado
     if @id_factura is null and @id_pago is null and @id_reembolso is null
     begin
-        print 'Debe ingresar al menos un tipo de movimiento.';
-        throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+        print 'Debe ingresar al menos un tipo de movimiento.'
+        return;
     end
 
     -- CASO 1: Si viene REEMBOLSO, prioridad total (movimiento positivo)
@@ -2445,9 +2272,16 @@ begin
     begin
         if not exists (select 1 from socio.reembolso where id = @id_reembolso)
         begin
-            print 'No existe el reembolso indicado.';
-            throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+            print 'No existe el reembolso indicado.'
+            return;
         end
+
+		select 
+			@monto = monto,
+			@descripcionTipoReembolso = tr.descripcion
+		from socio.reembolso r
+		inner join socio.tipo_reembolso tr on r.id_tipo_reembolso = tr.id
+		where r.id = @id_reembolso;
 
 		-- Guardo en montoAux el monto de los que no son pago a cuenta, que descontaremos luego del total para no impactar en la cuenta corriente estos casos
 		if @descripcionTipoReembolso <> 'Pago a cuenta'
@@ -2460,20 +2294,22 @@ begin
     begin
         if not exists (select 1 from socio.pago where id = @id_pago)
         begin
-            print 'No existe el pago indicado.';
-            throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+            print 'No existe el pago indicado.'
+            return;
         end
+
+        select @monto = monto from socio.pago where id = @id_pago
     end
     -- CASO 3: Solo factura (movimiento negativo)
     else if @id_factura is not null
     begin
         if not exists (select 1 from socio.factura where id = @id_factura)
         begin
-            print 'No existe la factura indicada.';
-            throw 50001, 'No existe una cuenta corriente con ese ID.', 1;
+            print 'No existe la factura indicada.'
+            return;
         end
 
-        set @monto = -1 * @monto;
+        select @monto = -1 * total from socio.factura where id = @id_factura
     end
 
     -- Insertar el movimiento
@@ -3414,7 +3250,7 @@ go
 /************************* INICIO EMPLEADO *******************************/
 /*************************************************************************/
 -- INSERT
-create procedure empleado.agregarEmpleado
+create procedure general.agregarEmpleado
     @nombre varchar(50),
     @apellido varchar(50),
     @idPuesto int
