@@ -21,7 +21,7 @@ create or alter procedure socio.altaObraSocialSocio
 as
 begin
     insert into socio.obra_social_socio (nombre, telefono_emergencia, numero_socio)
-    value (@nombre, @telefono_emergencia, @numero_socio);
+    values (@nombre, @telefono_emergencia, @numero_socio);
 end
 go
 
@@ -128,7 +128,7 @@ end
 go
 
 -- Delete
-create or replace procedure socio.bajaTutor
+create or alter procedure socio.bajaTutor
     @id int
 as
 begin
@@ -147,7 +147,8 @@ go
 -- Insert
 create or alter procedure socio.altaInscripcion
     @id_socio int,
-    @fecha_inscripcion
+    @fecha_inscripcion date
+as
 begin
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
@@ -155,10 +156,10 @@ begin
         return;
     end
 
-    insert into (id_socio, fecha_inscripcion)
+    insert into inscripcion(id_socio, fecha_inscripcion)
     values (@id_socio, @fecha_inscripcion);
 end
-
+go
 -- Update: no permitido en el sistema
 
 
@@ -168,7 +169,7 @@ end
 
 ---- Socio ----
 -- Insert
-create or replace procedure socio.altaSocio
+create or alter procedure socio.altaSocio
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
@@ -181,6 +182,7 @@ create or replace procedure socio.altaSocio
     @id_grupo_familiar int,
     @estado varchar(20),
     @responsable_pago bit
+as
 begin
     if @dni <= 0
     begin
@@ -229,11 +231,11 @@ begin
         end
 
         exec socio.altaInscripcion
-            @id_socio,
+            @id_socio_new,
             @fecha_actual;
 
         commit transaction;
-    end try;
+    end try
     begin catch
         rollback transaction;
         declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
@@ -244,7 +246,7 @@ end
 go
 
 -- Update
-create or replace procedure socio.modificacionSocio
+create or alter procedure socio.modificacionSocio
     @id int,
     @nombre varchar(100),
     @apellido varchar(100),
@@ -253,11 +255,12 @@ create or replace procedure socio.modificacionSocio
     @fecha_nacimiento date,
     @telefono varchar(20),
     @telefono_emergencia varchar(20),
-    @id_obra_social_socio int,
+    @id_obra_social_socio int
     /*@id_tutor int,*/
     /*@id_grupo_familiar int,*/
     /*@estado varchar(20)*/
     /*@responsable_pago bit*/
+as
 begin
     if @dni <= 0
     begin
@@ -276,7 +279,7 @@ begin
         apellido = @apellido,
         dni = @dni,
         email = @email,
-        parentesco = @parentesco,
+        --parentesco = @parentesco,
         responsable_pago =  1;
 
     update socio.socio
@@ -289,11 +292,12 @@ begin
         telefono_emergencia = @telefono_emergencia,
         id_obra_social_socio = @id_obra_social_socio;
 end
-
+go
 -- Delete
-create or replace procedure socio.actualizarEstadoSocio
+create or alter procedure socio.actualizarEstadoSocio
     @id int,
     @estado varchar(20)
+as
 begin
     if not exists (select 1 from socio.socio where id = @id)
     begin
@@ -322,6 +326,7 @@ create or alter procedure socio.altaDebitoAutomatico
     @token_pago varchar(200),
     @ultimos_4_digitos int,
     @titular varchar(100)
+as
 begin
     if not exists (select 1 from socio.socio where id = @id_responsable_pago)
     begin
@@ -342,6 +347,7 @@ create or alter procedure socio.modificacionDebitoAutomatico
     @token_pago varchar(200),
     @ultimos_4_digitos int,
     @titular varchar(100)
+as
 begin
     if not exists (select 1 from socio.debito_automatico where id = @id)
     begin
@@ -360,8 +366,9 @@ end
 go
 
 -- Delete
-create or replace procedure socio.bajaDebitoAutomatico
+create or alter procedure socio.bajaDebitoAutomatico
     @id int
+as
 begin
     if not exists (select 1 from socio.debito_automatico where id = @id)
     begin
@@ -379,17 +386,19 @@ go
 
 ---- Empleado ----
 -- Insert
-create or replace procedure socio.altaEmpleado
+create or alter procedure socio.altaEmpleado
     @nombre varchar(100)
+as
 begin
     insert into general.empleado (nombre)
     values (@nombre);
 end
-
+go
 -- Update
-create or replace procedure socio.modificacionEmpleado
+create or alter procedure socio.modificacionEmpleado
     @id int,
     @nombre varchar(100)
+as
 begin
     update general.empleado
     set nombre = @nombre
@@ -398,8 +407,9 @@ end
 go
 
 -- Delete
-create or replace procedure socio.bajaEmpleado
-    @id int,
+create or alter procedure socio.bajaEmpleado
+    @id int
+as
 begin
     if not exists (select 1 from general.empleado where id = @id)
     begin
@@ -421,11 +431,12 @@ go
 
 ---- Invitado ----
 -- Insert
-create or replace procedure socio.altaInvitado
+create or alter procedure socio.altaInvitado
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
     @email varchar(254)
+as
 begin
     insert into socio.invitado (nombre, apellido, dni, email)
     values (@nombre, @apellido, @dni, @email);
@@ -433,12 +444,13 @@ end
 go
 
 -- Update
-create or replace procedure socio.modificacionInvitado
+create or alter procedure socio.modificacionInvitado
     @id int,
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
     @email varchar(254)
+as
 begin
     update socio.invitado
     set nombre = @nombre,
@@ -447,10 +459,11 @@ begin
         email = @email
     where id = @id;
 end
-
+go
 -- Delete
-create or replace procedure socio.bajaInvitado
+create or alter procedure socio.bajaInvitado
     @id int
+as
 begin
     if not exists (select 1 from socio.invitado where id = @id)
     begin
@@ -466,11 +479,12 @@ go
 
 ---- Registro Pileta ----
 -- Insert
-create or replace procedure socio.altaRegistroPileta
+create or alter procedure socio.altaRegistroPileta
     @id_socio int,
     @id_invitado int,
     @fecha date,
-    @id_tarifa int,
+    @id_tarifa int
+as
 begin
     declare @id_registro_pileta int;
 
@@ -510,7 +524,7 @@ begin
             @id_registro_pileta = @id_registro_pileta;
 
         commit transaction;
-    end try;
+    end try
     begin catch
         rollback transaction;
         return;
@@ -525,6 +539,7 @@ create or alter procedure socio.altaActividadExtra
     @id_socio int,
     @nombre varchar(50),
     @costo decimal(8,2)
+as
 begin
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
@@ -544,11 +559,11 @@ begin
             @id_actividad_extra = @id_actividad_extra;
 
         commit transaction;
-    end try;
+    end try
     begin catch
         rollback transaction;
         return;
-    end catch;
+    end catch
 end
 go
 
@@ -679,6 +694,7 @@ go
 -- Insert
 create or alter procedure socio.altaTipoReembolso
     @descripcion varchar(50)
+as
 begin
     insert into socio.tipo_reembolso (descripcion)
     values (@descripcion);
@@ -689,6 +705,7 @@ go
 create or alter procedure socio.modificacionTipoReembolso
     @id int,
     @descripcion varchar(50)
+as
 begin
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
@@ -703,8 +720,9 @@ end
 go
 
 -- Delete
-create or replace procedure socio.bajaTipoReembolso
+create or alter procedure socio.bajaTipoReembolso
     @id int
+as
 begin
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
@@ -726,13 +744,14 @@ go
 
 ---- Clase ----
 -- Insert
-create or replace procedure general.altaClase
+create or alter procedure general.altaClase
     @hora_inicio time,
     @hora_fin time,
     @dia varchar(10),
     @id_categoria int,
     @id_actividad int,
     @id_empleado int
+as
 begin
     if not exists (select 1 from socio.categoria where id = @id_categoria)
     begin
@@ -758,7 +777,7 @@ end
 go
 
 -- Update
-create or replace procedure general.modificacionClase
+create or alter procedure general.modificacionClase
     @id int,
     @hora_inicio time,
     @hora_fin time,
@@ -766,6 +785,7 @@ create or replace procedure general.modificacionClase
     @id_categoria int,
     @id_actividad int,
     @id_empleado int
+as
 begin
     if not exists (select 1 from general.clase where id = @id)
     begin
@@ -782,10 +802,11 @@ begin
         id_empleado = @id_empleado
     where id = @id;
 end
-
+go
 -- Delete
-create or replace procedure general.bajaClase
+create or alter procedure general.bajaClase
     @id int
+as
 begin
     if not exists (select 1 from general.clase where id = @id)
     begin
@@ -801,10 +822,11 @@ go
 
 ---- Presentismo ----
 -- Insert
-create or replace procedure general.altaPresentismo
+create or alter procedure general.altaPresentismo
     @id_socio int,
     @id_clase int,
     @fecha date
+as
 begin
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
@@ -824,11 +846,12 @@ end
 go
 
 -- Update
-create or replace procedure general.modificacionPresentismo
+create or alter procedure general.modificacionPresentismo
     @id int,
     @id_socio int,
     @id_clase int,
     @fecha date
+as
 begin
     if not exists (select 1 from general.presentismo where id = @id)
     begin
@@ -842,16 +865,17 @@ begin
         fecha = @fecha
     where id = @id;
 end
-
+go
 
 ---- Inscripción Actividad ----
 -- Insert
-create or replace procedure socio.altaInscripcionActividad
+create or alter procedure socio.altaInscripcionActividad
     @id_cuota int,
     @id_actividad int,
     @activa bit = 1,
-    @fecha_inscripcion date = getdate(),
+    @fecha_inscripcion date,
     @fecha_baja date = null
+as
 begin
     if not exists (select 1 from socio.cuota where id = @id_cuota)
     begin
@@ -875,7 +899,7 @@ begin
     end
 
     declare @precio_actividad decimal(8,2);
-    select @precio_actividad = precio from general.actividad where id = @id_actividad;
+    select @precio_actividad = costo_mensual from general.actividad where id = @id_actividad;
 
     if @precio_actividad is null
     begin
@@ -891,7 +915,7 @@ begin
         values (@id_cuota, @id_actividad, @activa, @fecha_inscripcion, @fecha_baja);
 
         -- Actualizar el monto total de la cuota sumandole el precio de la actividad
-        declare @monto_total decimal(8,2);
+        --declare @monto_total decimal(8,2);
         select @monto_total = monto_total from socio.cuota where id = @id_cuota;
         set @monto_total = @monto_total + @precio_actividad;
 
@@ -899,7 +923,7 @@ begin
         exec socio.modificacionCuota @id_cuota, @monto_total;
 
         commit transaction;
-    end try;
+    end try
     begin catch
         rollback transaction;
         declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
@@ -912,8 +936,9 @@ go
 -- Update: no permitido en el sistema
 
 -- Delete
-create or replace procedure socio.bajaInscripcionActividad
+create or alter procedure socio.bajaInscripcionActividad
     @id int
+as
 begin
     if not exists (select 1 from socio.inscripcion_actividad where id = @id)
     begin
@@ -925,7 +950,7 @@ begin
     select @id_cuota = id_cuota from socio.inscripcion_actividad where id = @id;
 
     declare @precio_actividad decimal(8,2);
-    select @precio_actividad = precio from general.actividad where id = (select id_actividad from socio.inscripcion_actividad where id = @id);
+    select @precio_actividad = costo_mensual from general.actividad where id = (select id_actividad from socio.inscripcion_actividad where id = @id);
 
     if @precio_actividad is null
     begin
@@ -950,7 +975,7 @@ begin
         exec socio.modificacionCuota @id_cuota, @monto_total;
 
         commit transaction;
-    end try;
+    end try
     begin catch
         rollback transaction;
         declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
@@ -963,10 +988,11 @@ go
 
 ---- Cuota ----
 -- Insert
-create or replace procedure socio.altaCuota
+create or alter procedure socio.altaCuota
     @id_socio int,
     @id_categoria int,
     @monto_total decimal(8,2) = 0
+as
 begin
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
@@ -986,9 +1012,10 @@ end
 go
 
 -- Update
-create or replace procedure socio.modificacionCuota
+create or alter procedure socio.modificacionCuota
     @id int,
     @monto_total decimal(8,2)
+as
 begin
     if not exists (select 1 from socio.cuota where id = @id)
     begin
@@ -997,7 +1024,7 @@ begin
     end
 
     update socio.cuota
-    set id_categoria = @id_categoria,
+    set --id_categoria = @id_categoria,
         monto_total = @monto_total
     where id = @id;
 end
@@ -1008,7 +1035,7 @@ go
 
 ---- Factura Cuota ----
 -- Insert
-create or replace procedure socio.altaFacturaCuota
+create or alter procedure socio.altaFacturaCuota
     @numero_comprobante int = null,
     @tipo_comprobante varchar(2) = 'B',
     @fecha_emision date = null,
@@ -1019,6 +1046,7 @@ create or replace procedure socio.altaFacturaCuota
     @importe_total decimal(8,2) = null,
     @descripcion varchar(100) = null,
     @id_cuota int
+as
 begin
     if not exists (select 1 from socio.cuota where id = @id_cuota)
     begin
@@ -1357,6 +1385,7 @@ begin
     declare @id_estado_cuenta int;
     declare @importe_factura decimal(8,2);
     declare @tipo_factura varchar(20);
+	declare @message varchar(50);
 
     -- Determinar el tipo de factura y obtener información
     if @id_factura_cuota is not null
@@ -1425,10 +1454,10 @@ begin
         -- Para facturas extra, obtener el socio y determinar el responsable de pago
         declare @id_registro_pileta int;
         declare @id_actividad_extra int;
-        declare @id_socio int;
-        declare @responsable_pago bit;
-        declare @id_grupo_familiar int;
-        declare @id_tutor int;
+        --declare @id_socio int;
+        --declare @responsable_pago bit;
+        --declare @id_grupo_familiar int;
+        --declare @id_tutor int;
 
         select @importe_factura = fe.importe_total,
                @id_registro_pileta = fe.id_registro_pileta,
@@ -1490,9 +1519,10 @@ begin
     end
 
     -- Validar que el monto del pago coincida con el importe de la factura
+	set @message = N' El monto del pago '+ CAST(@monto AS NVARCHAR(20)) + ' debe coincidir con el importe de la factura '+ CAST(@importe_factura AS NVARCHAR(20)) +' ';
     if @monto != @importe_factura
     begin
-        raiserror('El monto del pago (%.2f) debe coincidir con el importe de la factura (%.2f).', 16, 1, @monto, @importe_factura);
+        raiserror(@message, 16, 1);
         return;
     end
 
@@ -1501,9 +1531,10 @@ begin
     from socio.estado_cuenta 
     where id_socio = @id_socio_responsable;
 
+	set @message = N'No existe un estado de cuenta para el responsable de pago (ID: .'+ @id_socio_responsable +' )';
     if @id_estado_cuenta is null
     begin
-        raiserror('No existe un estado de cuenta para el responsable de pago (ID: %d).', 16, 1, @id_socio_responsable);
+        raiserror('No existe un estado de cuenta para el responsable de pago (ID: %d).', 16, 1);
         return;
     end
 
@@ -1553,6 +1584,7 @@ create or alter procedure socio.altaReembolso
     @id_tipo_reembolso int
 as
 begin
+	declare @message varchar(50);
     -- Validar que el pago existe
     if not exists (select 1 from socio.pago where id = @id_pago)
     begin
@@ -1575,9 +1607,10 @@ begin
     declare @monto_pago decimal(8,2);
     select @monto_pago = monto from socio.pago where id = @id_pago;
 
+	set @message = N'El monto del reembolso ('+ CAST(@monto AS VARCHAR(20)) +') no puede exceder el monto del pago ('+ CAST(@monto_pago AS VARCHAR(20))+ ').'
     if @monto > @monto_pago
     begin
-        raiserror('El monto del reembolso (%.2f) no puede exceder el monto del pago (%.2f).', 16, 1, @monto, @monto_pago);
+        raiserror(@message, 16, 1);
         return;
     end
 
