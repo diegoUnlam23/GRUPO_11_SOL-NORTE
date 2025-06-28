@@ -54,6 +54,18 @@ create table socio.socio
 );
 go
 
+create table socio.debito_automatico
+(
+	id					int primary key identity(1,1),
+	id_socio			int NOT NULL,
+	medio_de_pago		varchar(50) NOT NULL,
+	activo				bit NOT NULL,
+	token_pago			varchar(200) NOT NULL,
+	ultimos_4_digitos	int NOT NULL,
+	titular				varchar(100) NOT NULL,
+	foreign key (id_socio) references socio.socio(id)
+)
+
 create table socio.inscripcion
 (
 	id				    int primary key identity(1,1),
@@ -125,8 +137,6 @@ create table socio.registro_pileta
 	id_invitado 	    int,
 	fecha			    date NOT NULL,
 	id_tarifa		    int NOT NULL,
-	id_medio_de_pago	int NOT NULL,
-	foreign key (id_medio_de_pago) references socio.medio_de_pago(id),
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_invitado) references socio.invitado(id),
 	foreign key (id_tarifa) references socio.tarifa_pileta(id)
@@ -145,9 +155,7 @@ create table general.actividad_extra
 (
 	id					int primary key identity(1,1),
 	nombre				varchar(50) NOT NULL,
-	costo				decimal(8,2) NOT NULL,
-	id_medio_de_pago	int NOT NULL,
-	foreign key (id_medio_de_pago) references socio.medio_de_pago(id)
+	costo				decimal(8,2) NOT NULL
 );
 go
 
@@ -266,6 +274,7 @@ create table socio.pago
 	id						int primary key identity (1,1),
 	fecha_pago				date NOT NULL,
 	monto					decimal(8,2) NOT NULL,
+	medio_de_pago			varchar(50) NOT NULL,
 	es_debito_automatico	bit default 0 NOT NULL,
 	id_factura_cuota		int,
 	id_factura_extra		int,
