@@ -57,13 +57,13 @@ go
 create table socio.debito_automatico
 (
 	id					int primary key identity(1,1),
-	id_socio			int NOT NULL,
+	id_responsable_pago	int NOT NULL,
 	medio_de_pago		varchar(50) NOT NULL,
 	activo				bit NOT NULL,
 	token_pago			varchar(200) NOT NULL,
 	ultimos_4_digitos	int NOT NULL,
 	titular				varchar(100) NOT NULL,
-	foreign key (id_socio) references socio.socio(id)
+	foreign key (id_responsable_pago) references socio.socio(id)
 )
 
 create table socio.inscripcion
@@ -92,23 +92,14 @@ create table socio.categoria
 );
 go
 
-create table socio.medio_de_pago
-(
-	id		int primary key identity(1,1),
-	tipo	varchar(50) NOT NULL
-);
-go
-
 create table socio.cuota
 (
 	id					int primary key identity(1,1),
 	id_socio			int NOT NULL,
 	id_categoria		int NOT NULL,
-	id_medio_pago		int NOT NULL,
 	monto_total			decimal(8,2),
 	foreign key (id_socio) references socio.socio(id),
-	foreign key (id_categoria) references socio.categoria(id),
-	foreign key (id_medio_pago) references socio.medio_de_pago(id)
+	foreign key (id_categoria) references socio.categoria(id)
 );
 go
 
@@ -164,7 +155,9 @@ create table socio.inscripcion_actividad
 	id					int primary key identity(1,1),
 	id_cuota			int NOT NULL,
 	id_actividad		int NOT NULL,
-	fecha_inscripcion	datetime NOT NULL,	
+	activa				bit NOT NULL,
+	fecha_inscripcion	datetime NOT NULL,
+	fecha_baja			datetime,
 	foreign key (id_cuota) references socio.cuota(id),
 	foreign key (id_actividad) references general.actividad(id),
 );

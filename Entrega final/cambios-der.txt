@@ -1,2 +1,3 @@
 - Eliminamos la entidad "Medio de Pago" que estaba asociada a la Cuota / Registro Pileta / Actividad Extra y la agregamos como un atributo de la entidad "Pago".
 - Agregamos una entidad "Débito Automático" para poder almacenar los datos de aquellos Socios adheridos a él junto con datos de su medio de pago.
+- Agregamos los campos "activa" y "fecha_baja" en la entidad "Inscripción Actividad" para poder diferenciar cuando una inscripción a una determinada actividad está activa o no.
