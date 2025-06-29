@@ -1033,6 +1033,121 @@ go
 -- Delete: no permitido en el sistema
 
 
+---- Cálculo de Descuentos ----
+-- Procedimiento para calcular descuentos en facturación
+create or alter procedure socio.calcularDescuentos
+    @id_cuota int,
+    @costo_categoria decimal(8,2),
+    @total_actividades decimal(8,2),
+    @descuento_familiar decimal(8,2) output,
+    @descuento_actividades decimal(8,2) output,
+    @total_con_descuentos decimal(8,2) output
+as
+begin
+    declare @id_socio int;
+    declare @id_grupo_familiar int;
+    declare @cantidad_actividades int;
+    declare @total_sin_descuentos decimal(8,2);
+    
+    -- Inicializar variables
+    set @descuento_familiar = 0;
+    set @descuento_actividades = 0;
+    
+    -- Obtener información del socio
+    select @id_socio = c.id_socio,
+           @id_grupo_familiar = s.id_grupo_familiar
+    from socio.cuota c
+    inner join socio.socio s on c.id_socio = s.id
+    where c.id = @id_cuota;
+    
+    -- Calcular total sin descuentos
+    set @total_sin_descuentos = @costo_categoria + @total_actividades;
+    
+    -- Verificar descuento familiar (15% en el total de la facturación de membresías)
+    if @id_grupo_familiar is not null
+    begin
+        -- Verificar si hay otros miembros en el grupo familiar
+        declare @cantidad_miembros_familia int;
+        select @cantidad_miembros_familia = count(*)
+        from socio.socio
+        where id_grupo_familiar = @id_grupo_familiar
+        or id = @id_grupo_familiar;
+        
+        if @cantidad_miembros_familia > 1
+        begin
+            set @descuento_familiar = @total_sin_descuentos * 0.15; -- 15% de descuento
+        end
+    end
+    
+    -- Verificar descuento por múltiples actividades (10% en el total de actividades deportivas)
+    select @cantidad_actividades = count(*)
+    from socio.inscripcion_actividad ia
+    where ia.id_cuota = @id_cuota
+    and ia.activa = 1;
+    
+    if @cantidad_actividades > 1
+    begin
+        set @descuento_actividades = @total_actividades * 0.10; -- 10% de descuento en actividades
+    end
+    
+    -- Calcular total con descuentos
+    set @total_con_descuentos = @total_sin_descuentos - @descuento_familiar - @descuento_actividades;
+end
+go
+
+-- Procedimiento para consultar descuentos aplicados a una factura
+create or alter procedure socio.consultarDescuentosFactura
+    @id_factura_cuota int
+as
+begin
+    if not exists (select 1 from socio.factura_cuota where id = @id_factura_cuota)
+    begin
+        raiserror('No existe una factura cuota con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Mostrar información de la factura
+    select 
+        fc.numero_comprobante,
+        fc.fecha_emision,
+        fc.importe_total as 'Total Factura',
+        s.nombre + ' ' + s.apellido as 'Socio',
+        c.nombre as 'Categoría'
+    from socio.factura_cuota fc
+    inner join socio.cuota cu on fc.id_cuota = cu.id
+    inner join socio.socio s on cu.id_socio = s.id
+    inner join socio.categoria c on cu.id_categoria = c.id
+    where fc.id = @id_factura_cuota;
+
+    -- Mostrar items de la factura con descuentos
+    select 
+        tipo_item,
+        cantidad,
+        precio_unitario,
+        subtotal,
+        importe_total,
+        case 
+            when tipo_item like '%Descuento%' then 'DESCUENTO'
+            else 'ITEM'
+        end as 'Tipo'
+    from socio.item_factura_cuota
+    where id_factura_cuota = @id_factura_cuota
+    order by 
+        case when tipo_item like '%Descuento%' then 2 else 1 end,
+        tipo_item;
+
+    -- Mostrar resumen de descuentos
+    select 
+        sum(case when tipo_item like '%Familiar%' then abs(importe_total) else 0 end) as 'Descuento Familiar',
+        sum(case when tipo_item like '%Múltiples Actividades%' then abs(importe_total) else 0 end) as 'Descuento Actividades',
+        sum(case when tipo_item like '%Descuento%' then abs(importe_total) else 0 end) as 'Total Descuentos'
+    from socio.item_factura_cuota
+    where id_factura_cuota = @id_factura_cuota
+    and tipo_item like '%Descuento%';
+end
+go
+
+
 ---- Factura Cuota ----
 -- Insert
 create or alter procedure socio.altaFacturaCuota
@@ -1131,6 +1246,31 @@ begin
         return;
     end
 
+    -- Calcular total de actividades
+    declare @total_actividades decimal(8,2);
+    select @total_actividades = isnull(sum(a.costo_mensual), 0)
+    from socio.inscripcion_actividad ia
+    inner join general.actividad a on ia.id_actividad = a.id
+    where ia.id_cuota = @id_cuota
+    and ia.activa = 1;
+
+    -- Calcular descuentos
+    declare @descuento_familiar decimal(8,2);
+    declare @descuento_actividades decimal(8,2);
+    declare @total_con_descuentos decimal(8,2);
+
+    exec socio.calcularDescuentos
+        @id_cuota = @id_cuota,
+        @costo_categoria = @costo_categoria,
+        @total_actividades = @total_actividades,
+        @descuento_familiar = @descuento_familiar output,
+        @descuento_actividades = @descuento_actividades output,
+        @total_con_descuentos = @total_con_descuentos output;
+
+    -- Si no se proporciona importe_total, usar el calculado con descuentos
+    if @importe_total is null
+        set @importe_total = @total_con_descuentos;
+
     begin try
         begin transaction;
 
@@ -1144,8 +1284,11 @@ begin
         );
         set @id_factura_cuota = scope_identity();
 
-        -- Insertar los items de la factura cuota (categoría y actividades)
-        exec socio.altaItemFacturaCuota @id_factura_cuota;
+        -- Insertar los items de la factura cuota (categoría y actividades) con descuentos
+        exec socio.altaItemFacturaCuota 
+            @id_factura_cuota = @id_factura_cuota, 
+            @descuento_familiar = @descuento_familiar, 
+            @descuento_actividades = @descuento_actividades;
 
         -- Obtener el ID del estado de cuenta del responsable de pago
         select @id_estado_cuenta = id from socio.estado_cuenta where id_socio = @id_responsable_pago;
@@ -1182,7 +1325,9 @@ go
 ---- Item Factura Cuota ----
 -- Insert
 create or alter procedure socio.altaItemFacturaCuota
-    @id_factura_cuota int
+    @id_factura_cuota int,
+    @descuento_familiar decimal(8,2) = 0,
+    @descuento_actividades decimal(8,2) = 0
 as
 begin
     if not exists (select 1 from socio.factura_cuota where id = @id_factura_cuota)
@@ -1196,6 +1341,8 @@ begin
     declare @id_categoria int;
     declare @costo_categoria decimal(8,2);
     declare @nombre_categoria varchar(10);
+    declare @total_actividades decimal(8,2);
+    declare @cantidad_actividades int;
 
     -- Obtener información de la factura y cuota
     select @id_cuota = fc.id_cuota
@@ -1231,32 +1378,88 @@ begin
         return;
     end
 
+    -- Obtener información de actividades
+    select @total_actividades = isnull(sum(a.costo_mensual), 0),
+           @cantidad_actividades = count(*)
+    from socio.inscripcion_actividad ia
+    inner join general.actividad a on ia.id_actividad = a.id
+    where ia.id_cuota = @id_cuota
+    and ia.activa = 1;
+
     begin try
         begin transaction;
 
-        -- Insertar item de la categoría
+        -- Calcular descuento aplicado a la categoría (proporcional al descuento familiar)
+        declare @descuento_categoria decimal(8,2) = 0;
+        if @descuento_familiar > 0
+        begin
+            declare @total_sin_descuentos decimal(8,2) = @costo_categoria + @total_actividades;
+            if @total_sin_descuentos > 0
+                set @descuento_categoria = (@costo_categoria / @total_sin_descuentos) * @descuento_familiar;
+        end
+
+        -- Insertar item de la categoría con descuento familiar aplicado
         insert into socio.item_factura_cuota (
             id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
         ) values (
-            @id_factura_cuota, 1, @costo_categoria, 21, 'Categoría - ' + @nombre_categoria, @costo_categoria, @costo_categoria
+            @id_factura_cuota, 1, @costo_categoria, 21, 'Categoría - ' + @nombre_categoria, 
+            @costo_categoria, @costo_categoria - @descuento_categoria
         );
 
-        -- Insertar items de todas las actividades asociadas a la cuota
-        insert into socio.item_factura_cuota (
-            id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
-        )
-        select 
-            @id_factura_cuota,
-            1,
-            a.costo_mensual,
-            21,
-            'Actividad - ' + a.nombre,
-            a.costo_mensual,
-            a.costo_mensual
-        from socio.inscripcion_actividad ia
-        inner join general.actividad a on ia.id_actividad = a.id
-        where ia.id_cuota = @id_cuota
-        and ia.activa = 1;
+        -- Insertar items de todas las actividades asociadas a la cuota con descuentos aplicados
+        if @cantidad_actividades > 0
+        begin
+            -- Calcular descuento por actividad (proporcional al descuento de actividades)
+            declare @descuento_por_actividad decimal(8,2) = 0;
+            if @descuento_actividades > 0 and @total_actividades > 0
+                set @descuento_por_actividad = @descuento_actividades / @cantidad_actividades;
+
+            -- Calcular descuento familiar por actividad (proporcional)
+            declare @descuento_familiar_por_actividad decimal(8,2) = 0;
+            if @descuento_familiar > 0
+            begin
+                declare @total_sin_descuentos_act decimal(8,2) = @costo_categoria + @total_actividades;
+                if @total_sin_descuentos_act > 0
+                    set @descuento_familiar_por_actividad = (@total_actividades / @total_sin_descuentos_act) * @descuento_familiar / @cantidad_actividades;
+            end
+
+            insert into socio.item_factura_cuota (
+                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+            )
+            select 
+                @id_factura_cuota,
+                1,
+                a.costo_mensual,
+                21,
+                'Actividad - ' + a.nombre,
+                a.costo_mensual,
+                a.costo_mensual - @descuento_por_actividad - @descuento_familiar_por_actividad
+            from socio.inscripcion_actividad ia
+            inner join general.actividad a on ia.id_actividad = a.id
+            where ia.id_cuota = @id_cuota
+            and ia.activa = 1;
+        end
+
+        -- Insertar items de descuentos si existen
+        if @descuento_familiar > 0
+        begin
+            insert into socio.item_factura_cuota (
+                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+            ) values (
+                @id_factura_cuota, 1, -@descuento_familiar, 21, 'Descuento Familiar (15%)', 
+                -@descuento_familiar, -@descuento_familiar
+            );
+        end
+
+        if @descuento_actividades > 0
+        begin
+            insert into socio.item_factura_cuota (
+                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+            ) values (
+                @id_factura_cuota, 1, -@descuento_actividades, 21, 'Descuento Múltiples Actividades (10%)', 
+                -@descuento_actividades, -@descuento_actividades
+            );
+        end
 
         commit transaction;
     end try
@@ -1773,6 +1976,67 @@ begin
         raiserror('Error al crear el reembolso: %s', 16, 1, @ErrorMessage);
         return;
     end catch
+end
+go
+
+-- Procedimiento de ejemplo para demostrar el uso de descuentos
+-- Este procedimiento muestra cómo crear una factura con descuentos automáticos
+create or alter procedure socio.ejemploFacturaConDescuentos
+    @id_cuota int
+as
+begin
+    declare @id_factura_cuota int;
+    declare @costo_categoria decimal(8,2);
+    declare @total_actividades decimal(8,2);
+    declare @descuento_familiar decimal(8,2);
+    declare @descuento_actividades decimal(8,2);
+    declare @total_con_descuentos decimal(8,2);
+
+    -- Obtener información de la cuota
+    select @costo_categoria = c.costo_mensual
+    from socio.cuota cu
+    inner join socio.categoria c on cu.id_categoria = c.id
+    where cu.id = @id_cuota;
+
+    -- Obtener total de actividades
+    select @total_actividades = isnull(sum(a.costo_mensual), 0)
+    from socio.inscripcion_actividad ia
+    inner join general.actividad a on ia.id_actividad = a.id
+    where ia.id_cuota = @id_cuota
+    and ia.activa = 1;
+
+    -- Calcular descuentos
+    exec socio.calcularDescuentos
+        @id_cuota = @id_cuota,
+        @costo_categoria = @costo_categoria,
+        @total_actividades = @total_actividades,
+        @descuento_familiar = @descuento_familiar output,
+        @descuento_actividades = @descuento_actividades output,
+        @total_con_descuentos = @total_con_descuentos output;
+
+    -- Mostrar información de descuentos calculados
+    print '=== RESUMEN DE DESCUENTOS ===';
+    print 'Costo Categoría: $' + cast(@costo_categoria as varchar(10));
+    print 'Total Actividades: $' + cast(@total_actividades as varchar(10));
+    print 'Subtotal: $' + cast(@costo_categoria + @total_actividades as varchar(10));
+    print 'Descuento Familiar (15%): $' + cast(@descuento_familiar as varchar(10));
+    print 'Descuento Múltiples Actividades (10%): $' + cast(@descuento_actividades as varchar(10));
+    print 'Total con Descuentos: $' + cast(@total_con_descuentos as varchar(10));
+    print '============================';
+
+    -- Crear la factura
+    exec socio.altaFacturaCuota
+        @id_cuota = @id_cuota,
+        @importe_total = @total_con_descuentos;
+
+    -- Obtener el ID de la factura creada
+    select @id_factura_cuota = max(id) from socio.factura_cuota where id_cuota = @id_cuota;
+
+    -- Mostrar detalles de la factura
+    print 'Factura creada con ID: ' + cast(@id_factura_cuota as varchar(10));
+    
+    -- Consultar descuentos aplicados
+    exec socio.consultarDescuentosFactura @id_factura_cuota;
 end
 go
 
