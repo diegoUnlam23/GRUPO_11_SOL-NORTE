@@ -24,11 +24,3 @@ GO
 -- Cambia el contexto a la base recién creada
 USE Com2900G11;
 GO
-
-
--- Creación de Base de Datos
-create database Com2900G11;
-go
-
-use Com2900G11;
-go

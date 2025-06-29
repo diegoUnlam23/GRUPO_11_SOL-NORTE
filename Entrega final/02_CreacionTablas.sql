@@ -109,7 +109,8 @@ create table socio.invitado
 	nombre					varchar(100) NOT NULL,
 	apellido				varchar(100) NOT NULL,
 	dni						int UNIQUE NOT NULL CHECK(dni > 0),
-	email					varchar(254) CHECK(email like '_%@_%._%')
+	email					varchar(254) CHECK(email like '_%@_%._%'),
+	saldo_a_favor			decimal(8,2) DEFAULT 0.00 NOT NULL
 );
 go
 
@@ -302,9 +303,9 @@ create table socio.movimiento_cuenta
 	id_estado_cuenta		int NOT NULL,
 	fecha					datetime NOT NULL,
 	monto					decimal(8,2) NOT NULL,
-	id_factura				int NOT NULL,
-	id_pago					int NOT NULL,
-	id_reembolso			int NOT NULL,
+	id_factura				int,
+	id_pago					int,
+	id_reembolso			int,
 	foreign key (id_estado_cuenta) references socio.estado_cuenta(id),
 	foreign key (id_factura) references socio.factura_cuota(id),
 	foreign key (id_pago) references socio.pago(id),

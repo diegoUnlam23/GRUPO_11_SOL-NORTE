@@ -435,11 +435,12 @@ create or alter procedure socio.altaInvitado
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
-    @email varchar(254)
+    @email varchar(254),
+    @saldo_a_favor decimal(8,2) = 0
 as
 begin
-    insert into socio.invitado (nombre, apellido, dni, email)
-    values (@nombre, @apellido, @dni, @email);
+    insert into socio.invitado (nombre, apellido, dni, email, saldo_a_favor)
+    values (@nombre, @apellido, @dni, @email, @saldo_a_favor);
 end
 go
 
@@ -449,14 +450,16 @@ create or alter procedure socio.modificacionInvitado
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
-    @email varchar(254)
+    @email varchar(254),
+    @saldo_a_favor decimal(8,2)
 as
 begin
     update socio.invitado
     set nombre = @nombre,
         apellido = @apellido,
         dni = @dni,
-        email = @email
+        email = @email,
+        saldo_a_favor = @saldo_a_favor
     where id = @id;
 end
 go
@@ -1299,16 +1302,18 @@ begin
             return;
         end
 
+        declare @monto_negativo decimal(8,2) = @importe_total * -1;
+
         -- Insertar movimiento de cuenta (monto negativo porque es una factura)
         exec socio.altaMovimientoCuenta
             @id_estado_cuenta = @id_estado_cuenta,
-            @monto = -@importe_total,
+            @monto = @monto_negativo,
             @id_factura = @id_factura_cuota;
 
         -- Actualizar el estado de cuenta del responsable de pago
         exec socio.modificacionEstadoCuenta
             @id_socio = @id_responsable_pago,
-            @monto = -@importe_total;
+            @monto = @monto_negativo;
 
         commit transaction;
     end try
@@ -2037,6 +2042,270 @@ begin
     
     -- Consultar descuentos aplicados
     exec socio.consultarDescuentosFactura @id_factura_cuota;
+end
+go
+
+
+---- Sistema de Reintegro por Lluvia ----
+-- Procedimiento para procesar reintegros por lluvia usando el sistema de reembolsos
+create or alter procedure socio.procesarReintegroLluvia
+    @fecha_lluvia date,
+    @porcentaje_reintegro decimal(5,2) = 60.00
+as
+begin
+    -- Validar que la fecha no sea futura
+    if @fecha_lluvia > getdate()
+    begin
+        raiserror('No se puede procesar reintegros para una fecha futura.', 16, 1);
+        return;
+    end
+
+    -- Validar que el porcentaje esté entre 0 y 100
+    if @porcentaje_reintegro < 0 or @porcentaje_reintegro > 100
+    begin
+        raiserror('El porcentaje de reintegro debe estar entre 0 y 100.', 16, 1);
+        return;
+    end
+
+    -- Obtener el tipo de reembolso "Pago a cuenta"
+    declare @id_tipo_reembolso int;
+    select @id_tipo_reembolso = id from socio.tipo_reembolso where descripcion = 'Pago a cuenta';
+    
+    if @id_tipo_reembolso is null
+    begin
+        raiserror('No existe el tipo de reembolso "Pago a cuenta".', 16, 1);
+        return;
+    end
+
+    declare @cantidad_procesados int = 0;
+    declare @total_procesado decimal(10,2) = 0;
+    declare @cantidad_socios int = 0;
+    declare @cantidad_invitados int = 0;
+
+    begin try
+        begin transaction;
+
+        -- Crear tabla temporal para procesar registros
+        create table #registros_procesar (
+            id int identity(1,1),
+            id_registro_pileta int,
+            id_socio int,
+            id_invitado int,
+            id_tarifa int,
+            precio_tarifa decimal(8,2),
+            monto_reintegro decimal(8,2),
+            id_responsable_pago int,
+            tipo_usuario varchar(10),
+            id_factura_extra int
+        );
+
+        -- Llenar tabla temporal con todos los registros a procesar
+        insert into #registros_procesar (id_registro_pileta, id_socio, id_invitado, id_tarifa, precio_tarifa, monto_reintegro, id_responsable_pago, tipo_usuario, id_factura_extra)
+        select 
+            rp.id,
+            rp.id_socio,
+            rp.id_invitado,
+            rp.id_tarifa,
+            tp.precio,
+            tp.precio * (@porcentaje_reintegro / 100.00),
+            case 
+                when rp.id_socio is not null then
+                    case 
+                        when s.responsable_pago = 1 then rp.id_socio
+                        when s.id_grupo_familiar is not null then s.id_grupo_familiar
+                        when s.id_tutor is not null then s.id_tutor
+                        else rp.id_socio
+                    end
+                else null
+            end,
+            case when rp.id_socio is not null then 'SOCIO' else 'INVITADO' end,
+            fe.id
+        from socio.registro_pileta rp
+        inner join socio.tarifa_pileta tp on rp.id_tarifa = tp.id
+        inner join socio.factura_extra fe on fe.id_registro_pileta = rp.id
+        left join socio.socio s on rp.id_socio = s.id
+        where rp.fecha = @fecha_lluvia;
+
+        -- Variables para el WHILE
+        declare @contador int = 1;
+        declare @max_id int;
+        declare @id_registro_pileta int;
+        declare @id_socio int;
+        declare @id_invitado int;
+        declare @id_tarifa int;
+        declare @precio_tarifa decimal(8,2);
+        declare @monto_reintegro decimal(8,2);
+        declare @id_responsable_pago int;
+        declare @tipo_usuario varchar(10);
+        declare @id_factura_extra int;
+        declare @id_pago int;
+        declare @id_reembolso int;
+        declare @id_estado_cuenta int;
+
+        -- Obtener el máximo ID para el WHILE
+        select @max_id = max(id) from #registros_procesar;
+
+        -- Procesar cada registro con WHILE
+        while @contador <= @max_id
+        begin
+            -- Obtener datos del registro actual
+            select 
+                @id_registro_pileta = id_registro_pileta,
+                @id_socio = id_socio,
+                @id_invitado = id_invitado,
+                @id_tarifa = id_tarifa,
+                @precio_tarifa = precio_tarifa,
+                @monto_reintegro = monto_reintegro,
+                @id_responsable_pago = id_responsable_pago,
+                @tipo_usuario = tipo_usuario,
+                @id_factura_extra = id_factura_extra
+            from #registros_procesar
+            where id = @contador;
+
+            if @tipo_usuario = 'SOCIO'
+            begin
+                -- Procesar socio
+                -- Obtener el ID del pago existente
+                select @id_pago = id from socio.pago 
+                where id_factura_extra = @id_factura_extra;
+
+                -- Validar que el pago existe
+                if @id_pago is null
+                begin
+                    raiserror('No se encontró el pago para la factura extra', 16, 1);
+                    return;
+                end
+
+                -- Crear reembolso
+                exec socio.altaReembolso
+                    @id_pago = @id_pago,
+                    @monto = @monto_reintegro,
+                    @fecha_reembolso = @fecha_lluvia,
+                    @motivo = 'Reintegro por lluvia',
+                    @id_tipo_reembolso = @id_tipo_reembolso;
+
+                set @cantidad_socios = @cantidad_socios + 1;
+            end
+            else if @tipo_usuario = 'INVITADO'
+            begin
+                -- Procesar invitado
+                update socio.invitado
+                set saldo_a_favor = saldo_a_favor + @monto_reintegro
+                where id = @id_invitado;
+
+                set @cantidad_invitados = @cantidad_invitados + 1;
+            end
+
+            set @total_procesado = @total_procesado + @monto_reintegro;
+            set @cantidad_procesados = @cantidad_procesados + 1;
+            set @contador = @contador + 1;
+        end
+
+        -- Limpiar tabla temporal
+        drop table #registros_procesar;
+
+        commit transaction;
+
+        -- Mostrar resumen del proceso
+        print '=== REINTEGRO POR LLUVIA PROCESADO ===';
+        print 'Fecha de lluvia: ' + cast(@fecha_lluvia as varchar(10));
+        print 'Porcentaje de reintegro: ' + cast(@porcentaje_reintegro as varchar(10)) + '%';
+        print 'Cantidad total de registros procesados: ' + cast(@cantidad_procesados as varchar(10));
+        print '  - Socios procesados: ' + cast(@cantidad_socios as varchar(10)) + ' (reembolsos)';
+        print '  - Invitados procesados: ' + cast(@cantidad_invitados as varchar(10)) + ' (saldo a favor)';
+        print 'Total reintegrado: $' + cast(@total_procesado as varchar(15));
+        print '=====================================';
+
+    end try
+    begin catch
+        if object_id('tempdb..#registros_procesar') is not null
+            drop table #registros_procesar;
+
+        rollback transaction;
+        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
+        raiserror('Error al procesar reintegro por lluvia: %s', 16, 1, @ErrorMessage);
+        return;
+    end catch
+end
+go
+
+
+-- Procedimiento para consultar saldo a favor de un invitado específico
+create or alter procedure socio.consultarSaldoInvitado
+    @id_invitado int = null,
+    @dni_invitado int = null
+as
+begin
+    declare @id int;
+    
+    -- Determinar el ID del invitado
+    if @id_invitado is not null
+    begin
+        set @id = @id_invitado;
+    end
+    else if @dni_invitado is not null
+    begin
+        select @id = id from socio.invitado where dni = @dni_invitado;
+        if @id is null
+        begin
+            raiserror('No se encontró un invitado con el DNI especificado.', 16, 1);
+            return;
+        end
+    end
+    else
+    begin
+        raiserror('Debe proporcionar un ID de invitado o DNI.', 16, 1);
+        return;
+    end
+
+    -- Mostrar información del invitado
+    select 
+        i.nombre + ' ' + i.apellido as 'Invitado',
+        i.dni,
+        i.email,
+        i.saldo_a_favor as 'Saldo a Favor'
+    from socio.invitado i
+    where i.id = @id;
+
+    -- Mostrar historial de uso de pileta
+    print '';
+    print '=== HISTORIAL DE USO DE PILETA ===';
+    select 
+        rp.fecha,
+        tp.tipo as 'Tipo Tarifa',
+        tp.precio as 'Precio Pagado',
+        case 
+            when rp.fecha <= getdate() then 'Completado'
+            else 'Programado'
+        end as 'Estado'
+    from socio.registro_pileta rp
+    inner join socio.tarifa_pileta tp on rp.id_tarifa = tp.id
+    where rp.id_invitado = @id
+    order by rp.fecha desc;
+
+    -- Mostrar resumen de uso
+    declare @total_uso decimal(8,2);
+    declare @cantidad_visitas int;
+    
+    select @total_uso = isnull(sum(tp.precio), 0),
+           @cantidad_visitas = count(*)
+    from socio.registro_pileta rp
+    inner join socio.tarifa_pileta tp on rp.id_tarifa = tp.id
+    where rp.id_invitado = @id;
+
+    print '';
+    print '=== RESUMEN ===';
+    print 'Total gastado en pileta: $' + cast(@total_uso as varchar(10));
+    print 'Cantidad de visitas: ' + cast(@cantidad_visitas as varchar(10));
+    
+    declare @saldo_actual decimal(8,2);
+    select @saldo_actual = saldo_a_favor from socio.invitado where id = @id;
+    print 'Saldo a favor actual: $' + cast(@saldo_actual as varchar(10));
+    
+    if @saldo_actual > 0
+    begin
+        print 'El invitado tiene crédito disponible para futuras visitas.';
+    end
 end
 go
 
