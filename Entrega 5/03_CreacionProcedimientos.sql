@@ -20,6 +20,7 @@ create or alter procedure socio.altaObraSocialSocio
     @numero_socio varchar(50)
 as
 begin
+    SET NOCOUNT ON;
     insert into socio.obra_social_socio (nombre, telefono_emergencia, numero_socio)
     values (@nombre, @telefono_emergencia, @numero_socio);
 end
@@ -33,6 +34,7 @@ create or alter procedure socio.modificacionObraSocialSocio
     @numero_socio varchar(50)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.obra_social_socio where id = @id)
     begin
         raiserror('No existe una obra social con ese ID.', 16, 1);
@@ -52,6 +54,7 @@ create or alter procedure socio.bajaObraSocialSocio
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.obra_social_socio where id = @id)
     begin
         raiserror('No existe una obra social con ese ID.', 16, 1);
@@ -79,6 +82,7 @@ create or alter procedure socio.altaTutor
     @parentesco varchar(20)
 as
 begin
+    SET NOCOUNT ON;
     if @dni <= 0
     begin
         raiserror('El DNI debe ser mayor a 0.', 16, 1);
@@ -106,6 +110,7 @@ create or alter procedure socio.modificacionTutor
     @parentesco varchar(20)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.tutor where id = @id)
     begin
         raiserror('No existe un tutor con ese ID.', 16, 1);
@@ -132,6 +137,7 @@ create or alter procedure socio.bajaTutor
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.tutor where id = @id)
     begin
         raiserror('No exite un tutor con ese ID.', 16, 1);
@@ -150,6 +156,7 @@ create or alter procedure socio.altaInscripcion
     @fecha_inscripcion date
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
@@ -184,6 +191,7 @@ create or alter procedure socio.altaSocio
     @responsable_pago bit
 as
 begin
+    SET NOCOUNT ON;
     if @dni <= 0
     begin
         raiserror('El DNI debe ser mayor a 0.', 16, 1);
@@ -204,7 +212,6 @@ begin
 
         declare @id_socio_new int = scope_identity();
 
-
         declare @edad int;
         declare @fecha_actual date;
         set @edad = datediff(YEAR, @fecha_nacimiento, getdate());
@@ -214,20 +221,37 @@ begin
         if dateadd(year, @edad, @fecha_nacimiento) > cast(@fecha_actual as date)
             set @edad = @edad - 1;
 
+        -- Determinar el responsable de pago para el estado de cuenta
+        declare @id_responsable_pago int;
+        
         if @edad < 18
         begin
-            declare @rp int;
-            set @rp = isnull(@id_tutor, @id_grupo_familiar);
-
-            exec socio.altaEstadoCuenta
-                @id_socio = @rp,
-                @saldo = 0;
+            -- Para menores, el responsable de pago puede ser tutor o grupo familiar
+            set @id_responsable_pago = isnull(@id_tutor, @id_grupo_familiar);
         end
         else
         begin
-            exec socio.altaEstadoCuenta
-                @id_socio = @id_socio_new,
-                @saldo = 0;
+            -- Para mayores, el responsable de pago es el propio socio si es responsable
+            if @responsable_pago = 1
+                set @id_responsable_pago = @id_socio_new;
+            else
+                set @id_responsable_pago = isnull(@id_tutor, @id_grupo_familiar);
+        end
+
+        -- Solo crear estado de cuenta si no existe uno para el responsable de pago
+        if @edad < 18 and @id_tutor is not null
+        begin
+            if not exists (select 1 from socio.estado_cuenta where id_tutor = @id_tutor)
+            begin
+                exec socio.altaEstadoCuenta @id_tutor = @id_tutor, @saldo = 0;
+            end
+        end
+        else if @id_responsable_pago is not null
+        begin
+            if not exists (select 1 from socio.estado_cuenta where id_socio = @id_responsable_pago)
+            begin
+                exec socio.altaEstadoCuenta @id_socio = @id_responsable_pago, @saldo = 0;
+            end
         end
 
         exec socio.altaInscripcion
@@ -239,7 +263,7 @@ begin
     begin catch
         rollback transaction;
         declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
-        print 'Error al agregar estado de cuenta: ' + @ErrorMessage;
+        print 'Error al agregar socio: ' + @ErrorMessage;
         return;
     end catch 
 end
@@ -262,6 +286,7 @@ create or alter procedure socio.modificacionSocio
     /*@responsable_pago bit*/
 as
 begin
+    SET NOCOUNT ON;
     if @dni <= 0
     begin
         raiserror('El DNI debe ser mayor a 0.', 16, 1);
@@ -299,6 +324,7 @@ create or alter procedure socio.actualizarEstadoSocio
     @estado varchar(20)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
@@ -328,6 +354,7 @@ create or alter procedure socio.altaDebitoAutomatico
     @titular varchar(100)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id_responsable_pago)
     begin
         raiserror('No existe un socio responsable de pago con ese ID.', 16, 1);
@@ -349,6 +376,7 @@ create or alter procedure socio.modificacionDebitoAutomatico
     @titular varchar(100)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.debito_automatico where id = @id)
     begin
         raiserror('No existe un debito automatico con ese ID.', 16, 1);
@@ -370,6 +398,7 @@ create or alter procedure socio.bajaDebitoAutomatico
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.debito_automatico where id = @id)
     begin
         raiserror('No existe un debito automatico con ese ID.', 16, 1);
@@ -386,20 +415,22 @@ go
 
 ---- Empleado ----
 -- Insert
-create or alter procedure socio.altaEmpleado
+create or alter procedure general.altaEmpleado
     @nombre varchar(100)
 as
 begin
+    SET NOCOUNT ON;
     insert into general.empleado (nombre)
     values (@nombre);
 end
 go
 -- Update
-create or alter procedure socio.modificacionEmpleado
+create or alter procedure general.modificacionEmpleado
     @id int,
     @nombre varchar(100)
 as
 begin
+    SET NOCOUNT ON;
     update general.empleado
     set nombre = @nombre
     where id = @id;
@@ -407,10 +438,11 @@ end
 go
 
 -- Delete
-create or alter procedure socio.bajaEmpleado
+create or alter procedure general.bajaEmpleado
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from general.empleado where id = @id)
     begin
         raiserror('No existe un empleado con ese ID.', 16, 1);
@@ -439,6 +471,7 @@ create or alter procedure socio.altaInvitado
     @saldo_a_favor decimal(8,2) = 0
 as
 begin
+    SET NOCOUNT ON;
     insert into socio.invitado (nombre, apellido, dni, email, saldo_a_favor)
     values (@nombre, @apellido, @dni, @email, @saldo_a_favor);
 end
@@ -454,6 +487,7 @@ create or alter procedure socio.modificacionInvitado
     @saldo_a_favor decimal(8,2)
 as
 begin
+    SET NOCOUNT ON;
     update socio.invitado
     set nombre = @nombre,
         apellido = @apellido,
@@ -468,6 +502,7 @@ create or alter procedure socio.bajaInvitado
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.invitado where id = @id)
     begin
         raiserror('No existe un invitado con ese ID.', 16, 1);
@@ -489,6 +524,7 @@ create or alter procedure socio.altaRegistroPileta
     @id_tarifa int
 as
 begin
+    SET NOCOUNT ON;
     declare @id_registro_pileta int;
 
     if @id_socio is not null and not exists (select 1 from socio.socio where id = @id_socio)
@@ -538,12 +574,13 @@ go
 
 ---- Actividad Extra ----
 -- Insert
-create or alter procedure socio.altaActividadExtra
+create or alter procedure general.altaActividadExtra
     @id_socio int,
     @nombre varchar(50),
     @costo decimal(8,2)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
@@ -553,8 +590,8 @@ begin
     begin try
         begin transaction;
 
-        insert into general.actividad_extra (nombre, costo)
-        values (@nombre, @costo);
+        insert into general.actividad_extra (id_socio, nombre, costo)
+        values (@id_socio, @nombre, @costo);
 
         declare @id_actividad_extra int = scope_identity();
 
@@ -574,19 +611,11 @@ go
 ---- Factura Extra ----
 -- Insert
 create or alter procedure socio.altaFacturaExtra
-    @numero_comprobante int = null,
-    @tipo_comprobante varchar(2) = 'B',
-    @fecha_emision date = null,
-    @periodo_facturado int = null,
-    @iva varchar(50) = '21%',
-    @fecha_vencimiento_1 date = null,
-    @fecha_vencimiento_2 date = null,
-    @importe_total decimal(8,2) = null,
-    @descripcion varchar(100) = null,
     @id_registro_pileta int = null,
     @id_actividad_extra int = null
 as
 begin
+    SET NOCOUNT ON;
     -- Validar que al menos uno de los parámetros no sea null
     if @id_registro_pileta is null and @id_actividad_extra is null
     begin
@@ -594,18 +623,19 @@ begin
         return;
     end
 
-    -- Establecer valores por defecto si no se proporcionan
-    if @fecha_emision is null
-        set @fecha_emision = getdate();
-    
-    if @fecha_vencimiento_1 is null
-        set @fecha_vencimiento_1 = dateadd(day, 30, @fecha_emision);
-    
-    if @fecha_vencimiento_2 is null
-        set @fecha_vencimiento_2 = dateadd(day, 40, @fecha_emision);
-    
-    if @periodo_facturado is null
-        set @periodo_facturado = year(@fecha_emision) * 100 + month(@fecha_emision); -- AAAAMM
+    -- Generar valores automáticamente
+    declare @numero_comprobante int;
+    declare @tipo_comprobante varchar(2) = 'B';
+    declare @fecha_emision date = getdate();
+    declare @periodo_facturado int = year(@fecha_emision) * 100 + month(@fecha_emision);
+    declare @iva varchar(50) = '21%';
+    declare @fecha_vencimiento_1 date = dateadd(day, 30, @fecha_emision);
+    declare @fecha_vencimiento_2 date = dateadd(day, 40, @fecha_emision);
+    declare @descripcion varchar(100);
+    declare @importe_total decimal(8,2);
+
+    -- Generar número de comprobante automáticamente
+    select @numero_comprobante = isnull(max(numero_comprobante), 0) + 1 from socio.factura_extra;
 
     declare @id_tarifa int;
     declare @precio_tarifa decimal(8,2);
@@ -632,12 +662,8 @@ begin
             return;
         end
 
-        if @importe_total is null
-            set @importe_total = @precio_tarifa;
-        
-        if @descripcion is null
-            set @descripcion = 'Factura por uso de pileta';
-        
+        set @importe_total = @precio_tarifa;
+        set @descripcion = 'Factura por uso de pileta';
         set @tipo_item = 'Uso de Pileta';
     end
 
@@ -652,7 +678,9 @@ begin
         end
 
         -- Obtener datos de la actividad extra
-        select @precio_tarifa = costo from general.actividad_extra where id = @id_actividad_extra;
+        declare @nombre_actividad_extra varchar(50);
+        select @precio_tarifa = costo, @nombre_actividad_extra = nombre 
+        from general.actividad_extra where id = @id_actividad_extra;
         
         if @precio_tarifa is null
         begin
@@ -660,18 +688,10 @@ begin
             return;
         end
 
-        if @importe_total is null
-            set @importe_total = @precio_tarifa;
-        
-        if @descripcion is null
-            set @descripcion = 'Factura por actividad extra';
-        
-        set @tipo_item = 'Actividad Extra';
+        set @importe_total = @precio_tarifa;
+        set @descripcion = 'Factura por actividad extra';
+        set @tipo_item = @nombre_actividad_extra;
     end
-
-    -- Generar número de comprobante si no se proporciona
-    if @numero_comprobante is null
-        select @numero_comprobante = isnull(max(numero_comprobante), 0) + 1 from socio.factura_extra;
 
     -- Insertar la factura extra
     insert into socio.factura_extra (
@@ -699,6 +719,7 @@ create or alter procedure socio.altaTipoReembolso
     @descripcion varchar(50)
 as
 begin
+    SET NOCOUNT ON;
     insert into socio.tipo_reembolso (descripcion)
     values (@descripcion);
 end
@@ -710,6 +731,7 @@ create or alter procedure socio.modificacionTipoReembolso
     @descripcion varchar(50)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
         raiserror('No existe un tipo de reembolso con ese ID.', 16, 1);
@@ -727,6 +749,7 @@ create or alter procedure socio.bajaTipoReembolso
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.tipo_reembolso where id = @id)
     begin
         raiserror('No existe un tipo de reembolso con ese ID.', 16, 1);
@@ -756,6 +779,7 @@ create or alter procedure general.altaClase
     @id_empleado int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.categoria where id = @id_categoria)
     begin
         raiserror('No existe una categoria con ese ID.', 16, 1);
@@ -790,6 +814,7 @@ create or alter procedure general.modificacionClase
     @id_empleado int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from general.clase where id = @id)
     begin
         raiserror('No existe una clase con ese ID.', 16, 1);
@@ -811,6 +836,7 @@ create or alter procedure general.bajaClase
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from general.clase where id = @id)
     begin
         raiserror('No existe una clase con ese ID.', 16, 1);
@@ -828,9 +854,11 @@ go
 create or alter procedure general.altaPresentismo
     @id_socio int,
     @id_clase int,
-    @fecha date
+    @fecha date,
+    @tipo_asistencia varchar(1)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
@@ -843,8 +871,8 @@ begin
         return;
     end
 
-    insert into general.presentismo (id_socio, id_clase, fecha)
-    values (@id_socio, @id_clase, @fecha);
+    insert into general.presentismo (id_socio, id_clase, fecha, tipo_asistencia)
+    values (@id_socio, @id_clase, @fecha, @tipo_asistencia);
 end
 go
 
@@ -853,9 +881,11 @@ create or alter procedure general.modificacionPresentismo
     @id int,
     @id_socio int,
     @id_clase int,
-    @fecha date
+    @fecha date,
+    @tipo_asistencia varchar(1)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from general.presentismo where id = @id)
     begin
         raiserror('No existe un presentismo con ese ID.', 16, 1);
@@ -865,7 +895,8 @@ begin
     update general.presentismo
     set id_socio = @id_socio,
         id_clase = @id_clase,
-        fecha = @fecha
+        fecha = @fecha,
+        tipo_asistencia = @tipo_asistencia
     where id = @id;
 end
 go
@@ -880,6 +911,7 @@ create or alter procedure socio.altaInscripcionActividad
     @fecha_baja date = null
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.cuota where id = @id_cuota)
     begin
         raiserror('No existe una cuota con ese ID.', 16, 1);
@@ -943,6 +975,7 @@ create or alter procedure socio.bajaInscripcionActividad
     @id int
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.inscripcion_actividad where id = @id)
     begin
         raiserror('No existe una inscripción a actividad con ese ID.', 16, 1);
@@ -997,6 +1030,7 @@ create or alter procedure socio.altaCuota
     @monto_total decimal(8,2) = 0
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
@@ -1020,6 +1054,7 @@ create or alter procedure socio.modificacionCuota
     @monto_total decimal(8,2)
 as
 begin
+    SET NOCOUNT ON;
     if not exists (select 1 from socio.cuota where id = @id)
     begin
         raiserror('No existe una cuota con ese ID.', 16, 1);
@@ -1047,6 +1082,7 @@ create or alter procedure socio.calcularDescuentos
     @total_con_descuentos decimal(8,2) output
 as
 begin
+    SET NOCOUNT ON;
     declare @id_socio int;
     declare @id_grupo_familiar int;
     declare @cantidad_actividades int;
@@ -1154,15 +1190,6 @@ go
 ---- Factura Cuota ----
 -- Insert
 create or alter procedure socio.altaFacturaCuota
-    @numero_comprobante int = null,
-    @tipo_comprobante varchar(2) = 'B',
-    @fecha_emision date = null,
-    @periodo_facturado int = null,
-    @iva varchar(50) = '21%',
-    @fecha_vencimiento_1 date = null,
-    @fecha_vencimiento_2 date = null,
-    @importe_total decimal(8,2) = null,
-    @descripcion varchar(100) = null,
     @id_cuota int
 as
 begin
@@ -1172,18 +1199,18 @@ begin
         return;
     end
 
-    -- Establecer valores por defecto si no se proporcionan
-    if @fecha_emision is null
-        set @fecha_emision = getdate();
-    
-    if @fecha_vencimiento_1 is null
-        set @fecha_vencimiento_1 = dateadd(day, 30, @fecha_emision);
-    
-    if @fecha_vencimiento_2 is null
-        set @fecha_vencimiento_2 = dateadd(day, 40, @fecha_emision);
-    
-    if @periodo_facturado is null
-        set @periodo_facturado = year(@fecha_emision) * 100 + month(@fecha_emision); -- AAAAMM
+    -- Generar valores automáticamente
+    declare @numero_comprobante int;
+    declare @tipo_comprobante varchar(2) = 'B';
+    declare @fecha_emision date = getdate();
+    declare @periodo_facturado int = year(@fecha_emision) * 100 + month(@fecha_emision);
+    declare @iva varchar(50) = '21%';
+    declare @fecha_vencimiento_1 date = dateadd(day, 30, @fecha_emision);
+    declare @fecha_vencimiento_2 date = dateadd(day, 40, @fecha_emision);
+    declare @descripcion varchar(100) = 'Factura por cuota mensual';
+
+    -- Generar número de comprobante automáticamente
+    select @numero_comprobante = isnull(max(numero_comprobante), 0) + 1 from socio.factura_cuota;
 
     -- Obtener datos de la cuota y del socio
     declare @id_socio int;
@@ -1215,10 +1242,12 @@ begin
     end
 
     -- Determinar el responsable de pago
+    declare @es_tutor bit = 0;
     if @responsable_pago = 1
     begin
         -- El socio es responsable de pago
         set @id_responsable_pago = @id_socio;
+        set @es_tutor = 0;
     end
     else
     begin
@@ -1226,16 +1255,30 @@ begin
         if @id_grupo_familiar is not null
         begin
             set @id_responsable_pago = @id_grupo_familiar;
+            set @es_tutor = 0;
         end
         else if @id_tutor is not null
         begin
             set @id_responsable_pago = @id_tutor;
+            set @es_tutor = 1;
         end
         else
         begin
             raiserror('El socio no es responsable de pago y no tiene grupo familiar ni tutor asignado.', 16, 1);
             return;
         end
+    end
+
+    -- Obtener el ID del estado de cuenta del responsable de pago
+    if @es_tutor = 1
+        select @id_estado_cuenta = id from socio.estado_cuenta where id_tutor = @id_responsable_pago;
+    else
+        select @id_estado_cuenta = id from socio.estado_cuenta where id_socio = @id_responsable_pago;
+
+    if @id_estado_cuenta is null
+    begin
+        raiserror('No existe un estado de cuenta para el responsable de pago.', 16, 1);
+        return;
     end
 
     -- Obtener información de la categoría
@@ -1270,9 +1313,7 @@ begin
         @descuento_actividades = @descuento_actividades output,
         @total_con_descuentos = @total_con_descuentos output;
 
-    -- Si no se proporciona importe_total, usar el calculado con descuentos
-    if @importe_total is null
-        set @importe_total = @total_con_descuentos;
+    declare @importe_total decimal(8,2) = @total_con_descuentos;
 
     begin try
         begin transaction;
@@ -1293,15 +1334,6 @@ begin
             @descuento_familiar = @descuento_familiar, 
             @descuento_actividades = @descuento_actividades;
 
-        -- Obtener el ID del estado de cuenta del responsable de pago
-        select @id_estado_cuenta = id from socio.estado_cuenta where id_socio = @id_responsable_pago;
-
-        if @id_estado_cuenta is null
-        begin
-            raiserror('No existe un estado de cuenta para el responsable de pago (ID: %d).', 16, 1, @id_responsable_pago);
-            return;
-        end
-
         declare @monto_negativo decimal(8,2) = @importe_total * -1;
 
         -- Insertar movimiento de cuenta (monto negativo porque es una factura)
@@ -1311,9 +1343,10 @@ begin
             @id_factura = @id_factura_cuota;
 
         -- Actualizar el estado de cuenta del responsable de pago
-        exec socio.modificacionEstadoCuenta
-            @id_socio = @id_responsable_pago,
-            @monto = @monto_negativo;
+        if @es_tutor = 1
+            exec socio.modificacionEstadoCuenta @id_tutor = @id_responsable_pago, @monto = @monto_negativo;
+        else
+            exec socio.modificacionEstadoCuenta @id_socio = @id_responsable_pago, @monto = @monto_negativo;
 
         commit transaction;
     end try
@@ -1414,11 +1447,6 @@ begin
         -- Insertar items de todas las actividades asociadas a la cuota con descuentos aplicados
         if @cantidad_actividades > 0
         begin
-            -- Calcular descuento por actividad (proporcional al descuento de actividades)
-            declare @descuento_por_actividad decimal(8,2) = 0;
-            if @descuento_actividades > 0 and @total_actividades > 0
-                set @descuento_por_actividad = @descuento_actividades / @cantidad_actividades;
-
             -- Calcular descuento familiar por actividad (proporcional)
             declare @descuento_familiar_por_actividad decimal(8,2) = 0;
             if @descuento_familiar > 0
@@ -1438,7 +1466,7 @@ begin
                 21,
                 'Actividad - ' + a.nombre,
                 a.costo_mensual,
-                a.costo_mensual - @descuento_por_actividad - @descuento_familiar_por_actividad
+                a.costo_mensual - @descuento_familiar_por_actividad
             from socio.inscripcion_actividad ia
             inner join general.actividad a on ia.id_actividad = a.id
             where ia.id_cuota = @id_cuota
@@ -1481,24 +1509,60 @@ go
 ---- Estado Cuenta ----
 -- Insert
 create or alter procedure socio.altaEstadoCuenta
-    @id_socio int,
+    @id_socio int = null,
+    @id_tutor int = null,
     @saldo decimal(8,2) = 0
 as
 begin
-    if not exists (select 1 from socio.socio where id = @id_socio)
+    -- Validar que se proporcione al menos uno de los dos parámetros
+    if @id_socio is null and @id_tutor is null
     begin
-        raiserror('No existe un socio con ese ID.', 16, 1);
+        raiserror('Debe proporcionar al menos un id_socio o id_tutor.', 16, 1);
         return;
     end
 
-    if exists (select 1 from socio.estado_cuenta where id_socio = @id_socio)
+    -- Validar que no se proporcionen ambos parámetros
+    if @id_socio is not null and @id_tutor is not null
     begin
-        raiserror('Ya existe un estado de cuenta para este socio.', 16, 1);
+        raiserror('Solo puede proporcionar un tipo de responsable (socio o tutor), no ambos.', 16, 1);
         return;
     end
 
-    insert into socio.estado_cuenta (id_socio, saldo)
-    values (@id_socio, @saldo);
+    -- Validar que no exista ya un estado de cuenta para ese socio/tutor
+    if @id_socio is not null
+    begin
+        -- Validar que existe el socio
+        if not exists (select 1 from socio.socio where id = @id_socio)
+        begin
+            raiserror('No existe un socio con ese ID.', 16, 1);
+            return;
+        end
+
+        if exists (select 1 from socio.estado_cuenta where id_socio = @id_socio)
+        begin
+            raiserror('Ya existe un estado de cuenta para este socio.', 16, 1);
+            return;
+        end
+    end
+    else if @id_tutor is not null
+    begin
+        -- Validar que existe el tutor
+        if not exists (select 1 from socio.tutor where id = @id_tutor)
+        begin
+            raiserror('No existe un tutor con ese ID.', 16, 1);
+            return;
+        end
+
+        if exists (select 1 from socio.estado_cuenta where id_tutor = @id_tutor)
+        begin
+            raiserror('Ya existe un estado de cuenta para este tutor.', 16, 1);
+            return;
+        end
+    end
+
+    -- Crear el nuevo estado de cuenta
+    insert into socio.estado_cuenta (id_socio, id_tutor, saldo)
+    values (@id_socio, @id_tutor, @saldo);
 end
 go
 
@@ -1533,24 +1597,64 @@ go
 
 -- Update
 create or alter procedure socio.modificacionEstadoCuenta
-    @id_socio int,
+    @id_socio int = null,
+    @id_tutor int = null,
     @monto decimal(8,2)
 as
 begin
-    if not exists (select 1 from socio.socio where id = @id_socio)
+    -- Validar que se proporcione al menos uno de los dos parámetros
+    if @id_socio is null and @id_tutor is null
     begin
-        raiserror('No existe un socio con ese ID.', 16, 1);
+        raiserror('Debe proporcionar al menos un id_socio o id_tutor.', 16, 1);
+        return;
+    end
+
+    -- Validar que no se proporcionen ambos parámetros
+    if @id_socio is not null and @id_tutor is not null
+    begin
+        raiserror('Solo puede proporcionar un tipo de responsable (socio o tutor), no ambos.', 16, 1);
         return;
     end
 
     declare @id_estado_cuenta int;
-    select @id_estado_cuenta = id from socio.estado_cuenta where id_socio = @id_socio;
 
-    if @id_estado_cuenta is null
+    -- Buscar el estado de cuenta según el tipo de responsable
+    if @id_socio is not null
     begin
-        raiserror('No existe un estado de cuenta para este socio.', 16, 1);
-        return;
+        -- Validar que existe el socio
+        if not exists (select 1 from socio.socio where id = @id_socio)
+        begin
+            raiserror('No existe un socio con ese ID.', 16, 1);
+            return;
+        end
+
+        select @id_estado_cuenta = id from socio.estado_cuenta where id_socio = @id_socio;
+
+        if @id_estado_cuenta is null
+        begin
+            raiserror('No existe un estado de cuenta para este socio.', 16, 1);
+            return;
+        end
     end
+    else if @id_tutor is not null
+    begin
+        -- Validar que existe el tutor
+        if not exists (select 1 from socio.tutor where id = @id_tutor)
+        begin
+            raiserror('No existe un tutor con ese ID.', 16, 1);
+            return;
+        end
+
+        select @id_estado_cuenta = id from socio.estado_cuenta where id_tutor = @id_tutor;
+
+        if @id_estado_cuenta is null
+        begin
+            raiserror('No existe un estado de cuenta para este tutor.', 16, 1);
+            return;
+        end
+    end
+
+    print 'monto: ' + cast(@monto as varchar(15));
 
     update socio.estado_cuenta
     set saldo = saldo + @monto
@@ -1588,12 +1692,26 @@ begin
     if @fecha_pago is null
         set @fecha_pago = getdate();
 
+    -- Declarar todas las variables al inicio
     declare @id_pago int;
     declare @id_socio_responsable int;
     declare @id_estado_cuenta int;
     declare @importe_factura decimal(8,2);
     declare @tipo_factura varchar(20);
-	declare @message varchar(50);
+    declare @message varchar(50);
+    declare @es_invitado bit = 0;
+    declare @id_invitado int;
+    declare @saldo_disponible decimal(8,2) = 0;
+    declare @monto_a_descontar decimal(8,2) = 0;
+    declare @monto_negativo decimal(8,2) = 0;
+    declare @id_cuota int;
+    declare @id_socio int;
+    declare @responsable_pago bit;
+    declare @id_grupo_familiar int;
+    declare @id_tutor int;
+    declare @id_registro_pileta int;
+    declare @id_actividad_extra int;
+    declare @es_tutor bit = 0;
 
     -- Determinar el tipo de factura y obtener información
     if @id_factura_cuota is not null
@@ -1606,12 +1724,6 @@ begin
         end
 
         -- Obtener información de la factura cuota y determinar el responsable de pago
-        declare @id_cuota int;
-        declare @id_socio int;
-        declare @responsable_pago bit;
-        declare @id_grupo_familiar int;
-        declare @id_tutor int;
-
         select @id_cuota = fc.id_cuota,
                @importe_factura = fc.importe_total
         from socio.factura_cuota fc
@@ -1626,20 +1738,23 @@ begin
         inner join socio.socio s on c.id_socio = s.id
         where c.id = @id_cuota;
 
-        -- Determinar el responsable de pago
+        -- Determinar el responsable de pago y si es tutor
         if @responsable_pago = 1
         begin
             set @id_socio_responsable = @id_socio;
+            set @es_tutor = 0;
         end
         else
         begin
             if @id_grupo_familiar is not null
             begin
                 set @id_socio_responsable = @id_grupo_familiar;
+                set @es_tutor = 0;
             end
             else if @id_tutor is not null
             begin
                 set @id_socio_responsable = @id_tutor;
+                set @es_tutor = 1;
             end
             else
             begin
@@ -1659,31 +1774,80 @@ begin
             return;
         end
 
-        -- Para facturas extra, obtener el socio y determinar el responsable de pago
-        declare @id_registro_pileta int;
-        declare @id_actividad_extra int;
-        --declare @id_socio int;
-        --declare @responsable_pago bit;
-        --declare @id_grupo_familiar int;
-        --declare @id_tutor int;
-
+        -- Para facturas extra, obtener el socio o invitado y determinar el responsable de pago
         select @importe_factura = fe.importe_total,
                @id_registro_pileta = fe.id_registro_pileta,
                @id_actividad_extra = fe.id_actividad_extra
         from socio.factura_extra fe
         where fe.id = @id_factura_extra;
 
-        -- Determinar el socio responsable según el tipo de factura extra
+        -- Determinar el socio o invitado responsable según el tipo de factura extra
         if @id_registro_pileta is not null
         begin
             -- Factura por registro de pileta
-            select @id_socio = rp.id_socio
+            select @id_socio = rp.id_socio,
+                   @id_invitado = rp.id_invitado
             from socio.registro_pileta rp
             where rp.id = @id_registro_pileta;
 
+            -- Verificar si es un pago de invitado
+            if @id_invitado is not null
+            begin
+                set @es_invitado = 1;
+                set @tipo_factura = 'EXTRA_INVITADO';
+            end
+            else if @id_socio is not null
+            begin
+                -- Obtener información del socio para determinar responsable de pago
+                select @responsable_pago = s.responsable_pago,
+                       @id_grupo_familiar = s.id_grupo_familiar,
+                       @id_tutor = s.id_tutor
+                from socio.socio s
+                where s.id = @id_socio;
+
+                -- Determinar el responsable de pago y si es tutor
+                if @responsable_pago = 1
+                begin
+                    set @id_socio_responsable = @id_socio;
+                    set @es_tutor = 0;
+                end
+                else
+                begin
+                    if @id_grupo_familiar is not null
+                    begin
+                        set @id_socio_responsable = @id_grupo_familiar;
+                        set @es_tutor = 0;
+                    end
+                    else if @id_tutor is not null
+                    begin
+                        set @id_socio_responsable = @id_tutor;
+                        set @es_tutor = 1;
+                    end
+                    else
+                    begin
+                        raiserror('El socio no es responsable de pago y no tiene grupo familiar ni tutor asignado.', 16, 1);
+                        return;
+                    end
+                end
+
+                set @tipo_factura = 'EXTRA_SOCIO';
+            end
+            else
+            begin
+                raiserror('No se encontró ni socio ni invitado asociado al registro de pileta.', 16, 1);
+                return;
+            end
+        end
+        else if @id_actividad_extra is not null
+        begin
+            -- Factura por actividad extra - obtener el socio desde la actividad extra
+            select @id_socio = ae.id_socio
+            from general.actividad_extra ae
+            where ae.id = @id_actividad_extra;
+
             if @id_socio is null
             begin
-                raiserror('No se encontró el socio asociado al registro de pileta.', 16, 1);
+                raiserror('No se encontró el socio asociado a la actividad extra.', 16, 1);
                 return;
             end
 
@@ -1694,20 +1858,23 @@ begin
             from socio.socio s
             where s.id = @id_socio;
 
-            -- Determinar el responsable de pago
+            -- Determinar el responsable de pago y si es tutor
             if @responsable_pago = 1
             begin
                 set @id_socio_responsable = @id_socio;
+                set @es_tutor = 0;
             end
             else
             begin
                 if @id_grupo_familiar is not null
                 begin
                     set @id_socio_responsable = @id_grupo_familiar;
+                    set @es_tutor = 0;
                 end
                 else if @id_tutor is not null
                 begin
                     set @id_socio_responsable = @id_tutor;
+                    set @es_tutor = 1;
                 end
                 else
                 begin
@@ -1715,41 +1882,60 @@ begin
                     return;
                 end
             end
-        end
-        else if @id_actividad_extra is not null
-        begin
-            -- Factura por actividad extra - necesitaríamos el socio asociado
-            raiserror('Para facturas de actividad extra, se requiere información adicional del socio.', 16, 1);
-            return;
-        end
 
-        set @tipo_factura = 'EXTRA';
+            set @tipo_factura = 'EXTRA_ACTIVIDAD';
+        end
     end
 
-    -- Validar que el monto del pago coincida con el importe de la factura
-	set @message = N' El monto del pago '+ CAST(@monto AS NVARCHAR(20)) + ' debe coincidir con el importe de la factura '+ CAST(@importe_factura AS NVARCHAR(20)) +' ';
-    if @monto != @importe_factura
+    -- Calcular saldo disponible y monto a descontar según el tipo de usuario
+    if @es_invitado = 1
     begin
-        raiserror(@message, 16, 1);
-        return;
+        -- Para invitados: usar saldo_a_favor
+        select @saldo_disponible = saldo_a_favor
+        from socio.invitado
+        where id = @id_invitado;
+
+        if @saldo_disponible is null
+            set @saldo_disponible = 0;
+
+        -- El monto a descontar es el mínimo entre el saldo disponible y el monto del pago
+        set @monto_a_descontar = case 
+            when @saldo_disponible >= @monto then @monto
+            else @saldo_disponible
+        end;
     end
-
-    -- Obtener el estado de cuenta del responsable de pago
-    select @id_estado_cuenta = id 
-    from socio.estado_cuenta 
-    where id_socio = @id_socio_responsable;
-
-	set @message = N'No existe un estado de cuenta para el responsable de pago (ID: .'+ @id_socio_responsable +' )';
-    if @id_estado_cuenta is null
+    else
     begin
-        raiserror('No existe un estado de cuenta para el responsable de pago (ID: %d).', 16, 1);
-        return;
+        -- Para socios/tutores: usar saldo positivo del estado de cuenta
+        if @es_tutor = 1
+            select @saldo_disponible = case 
+                when saldo > 0 then saldo
+                else 0
+            end
+            from socio.estado_cuenta
+            where id_tutor = @id_socio_responsable;
+        else
+            select @saldo_disponible = case 
+                when saldo > 0 then saldo
+                else 0
+            end
+            from socio.estado_cuenta
+            where id_socio = @id_socio_responsable;
+
+        if @saldo_disponible is null
+            set @saldo_disponible = 0;
+
+        -- El monto a descontar es el mínimo entre el saldo disponible y el monto del pago
+        set @monto_a_descontar = case 
+            when @saldo_disponible >= @monto then @monto
+            else @saldo_disponible
+        end;
     end
 
     begin try
         begin transaction;
 
-        -- Insertar el pago
+        -- Insertar el pago (siempre se registra el monto completo)
         insert into socio.pago (
             fecha_pago, monto, medio_de_pago, es_debito_automatico, 
             id_factura_cuota, id_factura_extra
@@ -1759,19 +1945,131 @@ begin
         );
         set @id_pago = scope_identity();
 
-        -- Generar movimiento de cuenta para ambos tipos de factura
-        -- Insertar movimiento de cuenta (monto positivo porque es un pago)
-        exec socio.altaMovimientoCuenta
-            @id_estado_cuenta = @id_estado_cuenta,
-            @monto = @monto,
-            @id_pago = @id_pago;
+        -- Actualizar saldo según el tipo de usuario
+        if @es_invitado = 1
+        begin
+            -- Para invitados: descontar del saldo_a_favor
+            if @monto_a_descontar > 0
+            begin
+                update socio.invitado
+                set saldo_a_favor = saldo_a_favor - @monto_a_descontar
+                where id = @id_invitado;
+            end
+        end
+        else
+        begin
+            -- Para socios/tutores: generar movimientos de cuenta SOLO para facturas cuota
+            -- Las facturas extra son pagos inmediatos y NO deben afectar el estado de cuenta
+            
+            if @tipo_factura = 'CUOTA'
+            begin
+                -- Obtener el estado de cuenta del responsable de pago
+                if @es_tutor = 1
+                    select @id_estado_cuenta = id 
+                    from socio.estado_cuenta 
+                    where id_tutor = @id_socio_responsable;
+                else
+                    select @id_estado_cuenta = id 
+                    from socio.estado_cuenta 
+                    where id_socio = @id_socio_responsable;
 
-        -- Actualizar el estado de cuenta del responsable de pago
-        exec socio.modificacionEstadoCuenta
-            @id_socio = @id_socio_responsable,
-            @monto = @monto;
+                if @id_estado_cuenta is null
+                begin
+                    raiserror('No existe un estado de cuenta para el responsable de pago.', 16, 1);
+                    return;
+                end
+
+                -- Verificar si hay saldo a favor (saldo positivo) para descontar
+                if @monto_a_descontar > 0
+                begin
+                    -- Generar movimiento de cuenta por el monto descontado del saldo a favor
+                    exec socio.altaMovimientoCuenta
+                        @id_estado_cuenta = @id_estado_cuenta,
+                        @monto = @monto_a_descontar,
+                        @id_pago = @id_pago;
+
+                    -- Actualizar el estado de cuenta descontando el saldo a favor utilizado
+                    set @monto_negativo = @monto_a_descontar * -1;
+                    if @es_tutor = 1
+                        exec socio.modificacionEstadoCuenta @id_tutor = @id_socio_responsable, @monto = @monto_negativo;
+                    else
+                        exec socio.modificacionEstadoCuenta @id_socio = @id_socio_responsable, @monto = @monto_negativo;
+                end
+
+                -- Generar movimiento de cuenta por el monto neto del pago (monto total - saldo a favor utilizado)
+                declare @monto_neto decimal(8,2);
+                set @monto_neto = @monto - @monto_a_descontar;
+
+                if @monto_neto > 0
+                begin
+                    exec socio.altaMovimientoCuenta
+                        @id_estado_cuenta = @id_estado_cuenta,
+                        @monto = @monto_neto,
+                        @id_pago = @id_pago;
+
+                    -- Actualizar el estado de cuenta sumando el monto neto del pago
+                    if @es_tutor = 1
+                        exec socio.modificacionEstadoCuenta @id_tutor = @id_socio_responsable, @monto = @monto_neto;
+                    else
+                        exec socio.modificacionEstadoCuenta @id_socio = @id_socio_responsable, @monto = @monto_neto;
+                end
+
+                -- Obtener el saldo final después de todas las actualizaciones
+                declare @saldo_final decimal(8,2);
+                if @es_tutor = 1
+                    select @saldo_final = saldo from socio.estado_cuenta where id_tutor = @id_socio_responsable;
+                else
+                    select @saldo_final = saldo from socio.estado_cuenta where id_socio = @id_socio_responsable;
+            end
+            else
+            begin
+                -- Para facturas extra: NO generar movimientos de cuenta ni afectar estado de cuenta
+                -- Son pagos inmediatos que se registran pero no alteran el saldo
+                print 'Pago de factura extra procesado - No se afecta el estado de cuenta (pago inmediato)';
+            end
+        end
 
         commit transaction;
+
+        -- Mostrar resumen del pago procesado
+        print '=== RESUMEN DEL PAGO ===';
+        print 'Monto de la factura: $' + cast(@importe_factura as varchar(15));
+        print 'Monto pagado: $' + cast(@monto as varchar(15));
+        print 'Saldo disponible: $' + cast(@saldo_disponible as varchar(15));
+        print 'Monto descontado del saldo: $' + cast(@monto_a_descontar as varchar(15));
+        if @es_invitado = 1
+        begin
+            print 'Tipo: Pago de Invitado';
+            print 'Saldo a favor restante: $' + cast(@saldo_disponible - @monto_a_descontar as varchar(15));
+        end
+        else
+        begin
+            if @tipo_factura = 'CUOTA'
+            begin
+                print 'Tipo: Pago de Factura Cuota (Socio/Tutor)';
+                if @monto_a_descontar > 0
+                begin
+                    print 'Se utilizó saldo a favor del estado de cuenta';
+                    print 'Monto neto aplicado al estado de cuenta: $' + cast(@monto - @monto_a_descontar as varchar(15));
+                end
+                else
+                    print 'No se utilizó saldo a favor';
+            end
+            else
+            begin
+                print 'Tipo: Pago de Factura Extra (Socio/Tutor) - PAGO INMEDIATO';
+                print 'NOTA: Las facturas extra NO afectan el estado de cuenta (pago inmediato)';
+                if @monto_a_descontar > 0
+                begin
+                    print 'Se utilizó saldo a favor del estado de cuenta';
+                    print 'Monto neto aplicado al estado de cuenta: $' + cast(@monto - @monto_a_descontar as varchar(15));
+                end
+                else
+                    print 'No se utilizó saldo a favor';
+            end
+        end
+        print '========================';
+
     end try
     begin catch
         rollback transaction;
@@ -1786,19 +2084,35 @@ go
 -- Insert
 create or alter procedure socio.altaReembolso
     @id_pago int,
-    @monto decimal(8,2),
     @fecha_reembolso datetime = null,
-    @motivo varchar(100),
-    @id_tipo_reembolso int
+    @motivo varchar(100) = 'Reembolso completo',
+    @id_tipo_reembolso int = 1,
+    @porcentaje_reembolso decimal(5,2) = 100.00
 as
 begin
-	declare @message varchar(50);
-    -- Validar que el pago existe
-    if not exists (select 1 from socio.pago where id = @id_pago)
+    declare @monto decimal(8,2);
+    declare @monto_pago decimal(8,2);
+    
+    -- Validar que el pago existe y obtener su monto
+    select @monto_pago = monto 
+    from socio.pago 
+    where id = @id_pago;
+    
+    if @monto_pago is null
     begin
         raiserror('No existe un pago con ese ID.', 16, 1);
         return;
     end
+
+    -- Validar que el porcentaje esté entre 0 y 100
+    if @porcentaje_reembolso < 0 or @porcentaje_reembolso > 100
+    begin
+        raiserror('El porcentaje de reembolso debe estar entre 0 y 100.', 16, 1);
+        return;
+    end
+
+    -- Calcular el monto del reembolso basado en el porcentaje
+    set @monto = @monto_pago * (@porcentaje_reembolso / 100.00);
 
     -- Validar que el tipo de reembolso existe
     if not exists (select 1 from socio.tipo_reembolso where id = @id_tipo_reembolso)
@@ -1811,21 +2125,11 @@ begin
     if @fecha_reembolso is null
         set @fecha_reembolso = getdate();
 
-    -- Validar que el monto del reembolso no exceda el monto del pago
-    declare @monto_pago decimal(8,2);
-    select @monto_pago = monto from socio.pago where id = @id_pago;
-
-	set @message = N'El monto del reembolso ('+ CAST(@monto AS VARCHAR(20)) +') no puede exceder el monto del pago ('+ CAST(@monto_pago AS VARCHAR(20))+ ').'
-    if @monto > @monto_pago
-    begin
-        raiserror(@message, 16, 1);
-        return;
-    end
-
     -- Determinar el responsable de pago del pago original
     declare @id_socio_responsable int;
     declare @id_estado_cuenta int;
     declare @id_reembolso int;
+    declare @es_tutor bit = 0;
 
     -- Obtener información del pago para determinar el responsable
     declare @id_factura_cuota int;
@@ -1857,20 +2161,23 @@ begin
         inner join socio.socio s on c.id_socio = s.id
         where c.id = @id_cuota;
 
-        -- Determinar el responsable de pago
+        -- Determinar el responsable de pago y si es tutor
         if @responsable_pago = 1
         begin
             set @id_socio_responsable = @id_socio;
+            set @es_tutor = 0;
         end
         else
         begin
             if @id_grupo_familiar is not null
             begin
                 set @id_socio_responsable = @id_grupo_familiar;
+                set @es_tutor = 0;
             end
             else if @id_tutor is not null
             begin
                 set @id_socio_responsable = @id_tutor;
+                set @es_tutor = 1;
             end
             else
             begin
@@ -1910,20 +2217,23 @@ begin
             from socio.socio s
             where s.id = @id_socio;
 
-            -- Determinar el responsable de pago
+            -- Determinar el responsable de pago y si es tutor
             if @responsable_pago = 1
             begin
                 set @id_socio_responsable = @id_socio;
+                set @es_tutor = 0;
             end
             else
             begin
                 if @id_grupo_familiar is not null
                 begin
                     set @id_socio_responsable = @id_grupo_familiar;
+                    set @es_tutor = 0;
                 end
                 else if @id_tutor is not null
                 begin
                     set @id_socio_responsable = @id_tutor;
+                    set @es_tutor = 1;
                 end
                 else
                 begin
@@ -1941,9 +2251,14 @@ begin
     end
 
     -- Obtener el estado de cuenta del responsable de pago
-    select @id_estado_cuenta = id 
-    from socio.estado_cuenta 
-    where id_socio = @id_socio_responsable;
+    if @es_tutor = 1
+        select @id_estado_cuenta = id 
+        from socio.estado_cuenta 
+        where id_tutor = @id_socio_responsable;
+    else
+        select @id_estado_cuenta = id 
+        from socio.estado_cuenta 
+        where id_socio = @id_socio_responsable;
 
     if @id_estado_cuenta is null
     begin
@@ -1969,11 +2284,27 @@ begin
             @id_reembolso = @id_reembolso;
 
         -- Actualizar el estado de cuenta del responsable de pago
-        exec socio.modificacionEstadoCuenta
-            @id_socio = @id_socio_responsable,
-            @monto = @monto;
+        if @es_tutor = 1
+            exec socio.modificacionEstadoCuenta @id_tutor = @id_socio_responsable, @monto = @monto;
+        else
+            exec socio.modificacionEstadoCuenta @id_socio = @id_socio_responsable, @monto = @monto;
 
         commit transaction;
+        
+        -- Mostrar resumen del reembolso
+        print '=== REEMBOLSO PROCESADO ===';
+        print 'ID Pago: ' + cast(@id_pago as varchar(10));
+        print 'Monto del pago original: $' + cast(@monto_pago as varchar(15));
+        print 'Porcentaje de reembolso: ' + cast(@porcentaje_reembolso as varchar(10)) + '%';
+        print 'Monto reembolsado: $' + cast(@monto as varchar(15));
+        if @porcentaje_reembolso = 100.00
+            print 'Tipo: Reembolso completo (100% del pago original)';
+        else
+            print 'Tipo: Reembolso parcial (' + cast(@porcentaje_reembolso as varchar(10)) + '% del pago original)';
+        print 'Motivo: ' + @motivo;
+        print 'Fecha: ' + cast(@fecha_reembolso as varchar(20));
+        print '==========================';
+        
     end try
     begin catch
         rollback transaction;
@@ -2176,13 +2507,13 @@ begin
                     return;
                 end
 
-                -- Crear reembolso
+                -- Crear reembolso con el porcentaje especificado
                 exec socio.altaReembolso
                     @id_pago = @id_pago,
-                    @monto = @monto_reintegro,
                     @fecha_reembolso = @fecha_lluvia,
                     @motivo = 'Reintegro por lluvia',
-                    @id_tipo_reembolso = @id_tipo_reembolso;
+                    @id_tipo_reembolso = @id_tipo_reembolso,
+                    @porcentaje_reembolso = @porcentaje_reintegro;
 
                 set @cantidad_socios = @cantidad_socios + 1;
             end
@@ -2226,6 +2557,282 @@ begin
         raiserror('Error al procesar reintegro por lluvia: %s', 16, 1, @ErrorMessage);
         return;
     end catch
+end
+go
+
+
+---- Actividad ----
+-- Insert
+create or alter procedure general.altaActividad
+    @nombre varchar(50),
+    @costo_mensual decimal(8,2)
+as
+begin
+    if @costo_mensual <= 0
+    begin
+        raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from general.actividad where nombre = @nombre)
+    begin
+        raiserror('Ya existe una actividad con ese nombre.', 16, 1);
+        return;
+    end
+
+    insert into general.actividad (nombre, costo_mensual)
+    values (@nombre, @costo_mensual);
+end
+go
+
+-- Update
+create or alter procedure general.modificacionActividad
+    @id int,
+    @nombre varchar(50),
+    @costo_mensual decimal(8,2)
+as
+begin
+    if not exists (select 1 from general.actividad where id = @id)
+    begin
+        raiserror('No existe una actividad con ese ID.', 16, 1);
+        return;
+    end
+
+    if @costo_mensual <= 0
+    begin
+        raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from general.actividad where nombre = @nombre and id <> @id)
+    begin
+        raiserror('Ya existe otra actividad con ese nombre.', 16, 1);
+        return;
+    end
+
+    update general.actividad
+    set nombre = @nombre,
+        costo_mensual = @costo_mensual
+    where id = @id;
+end
+go
+
+-- Delete
+create or alter procedure general.bajaActividad
+    @id int
+as
+begin
+    if not exists (select 1 from general.actividad where id = @id)
+    begin
+        raiserror('No existe una actividad con ese ID.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.inscripcion_actividad where id_actividad = @id)
+    begin
+        raiserror('No se puede eliminar porque está vinculada a inscripciones de actividad.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from general.clase where id_actividad = @id)
+    begin
+        raiserror('No se puede eliminar porque está vinculada a clases.', 16, 1);
+        return;
+    end
+
+    delete from general.actividad where id = @id;
+end
+go
+
+
+---- Categoría ----
+-- Insert
+create or alter procedure socio.altaCategoria
+    @nombre varchar(50),
+    @costo_mensual decimal(8,2),
+    @edad_min int,
+    @edad_max int
+as
+begin
+    if @costo_mensual <= 0
+    begin
+        raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if @edad_min < 0 or @edad_max < 0
+    begin
+        raiserror('Las edades deben ser mayores o iguales a 0.', 16, 1);
+        return;
+    end
+
+    if @edad_min > @edad_max
+    begin
+        raiserror('La edad mínima no puede ser mayor a la edad máxima.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.categoria where nombre = @nombre)
+    begin
+        raiserror('Ya existe una categoría con ese nombre.', 16, 1);
+        return;
+    end
+
+    insert into socio.categoria (nombre, costo_mensual, edad_min, edad_max)
+    values (@nombre, @costo_mensual, @edad_min, @edad_max);
+end
+go
+
+-- Update
+create or alter procedure socio.modificacionCategoria
+    @id int,
+    @nombre varchar(50),
+    @costo_mensual decimal(8,2),
+    @edad_min int,
+    @edad_max int
+as
+begin
+    if not exists (select 1 from socio.categoria where id = @id)
+    begin
+        raiserror('No existe una categoría con ese ID.', 16, 1);
+        return;
+    end
+
+    if @costo_mensual <= 0
+    begin
+        raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if @edad_min < 0 or @edad_max < 0
+    begin
+        raiserror('Las edades deben ser mayores o iguales a 0.', 16, 1);
+        return;
+    end
+
+    if @edad_min > @edad_max
+    begin
+        raiserror('La edad mínima no puede ser mayor a la edad máxima.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.categoria where nombre = @nombre and id <> @id)
+    begin
+        raiserror('Ya existe otra categoría con ese nombre.', 16, 1);
+        return;
+    end
+
+    update socio.categoria
+    set nombre = @nombre,
+        costo_mensual = @costo_mensual,
+        edad_min = @edad_min,
+        edad_max = @edad_max
+    where id = @id;
+end
+go
+
+-- Delete
+create or alter procedure socio.bajaCategoria
+    @id int
+as
+begin
+    if not exists (select 1 from socio.categoria where id = @id)
+    begin
+        raiserror('No existe una categoría con ese ID.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.cuota where id_categoria = @id)
+    begin
+        raiserror('No se puede eliminar porque está vinculada a cuotas.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from general.clase where id_categoria = @id)
+    begin
+        raiserror('No se puede eliminar porque está vinculada a clases.', 16, 1);
+        return;
+    end
+
+    delete from socio.categoria where id = @id;
+end
+go
+
+
+---- Tarifa Pileta ----
+-- Insert
+create or alter procedure socio.altaTarifaPileta
+    @tipo varchar(20),
+    @precio decimal(8,2)
+as
+begin
+    if @precio <= 0
+    begin
+        raiserror('El precio debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.tarifa_pileta where tipo = @tipo)
+    begin
+        raiserror('Ya existe una tarifa con ese tipo.', 16, 1);
+        return;
+    end
+
+    insert into socio.tarifa_pileta (tipo, precio)
+    values (@tipo, @precio);
+end
+go
+
+-- Update
+create or alter procedure socio.modificacionTarifaPileta
+    @id int,
+    @tipo varchar(20),
+    @precio decimal(8,2)
+as
+begin
+    if not exists (select 1 from socio.tarifa_pileta where id = @id)
+    begin
+        raiserror('No existe una tarifa con ese ID.', 16, 1);
+        return;
+    end
+
+    if @precio <= 0
+    begin
+        raiserror('El precio debe ser mayor a 0.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.tarifa_pileta where tipo = @tipo and id <> @id)
+    begin
+        raiserror('Ya existe otra tarifa con ese tipo.', 16, 1);
+        return;
+    end
+
+    update socio.tarifa_pileta
+    set tipo = @tipo,
+        precio = @precio
+    where id = @id;
+end
+go
+
+-- Delete
+create or alter procedure socio.bajaTarifaPileta
+    @id int
+as
+begin
+    if not exists (select 1 from socio.tarifa_pileta where id = @id)
+    begin
+        raiserror('No existe una tarifa con ese ID.', 16, 1);
+        return;
+    end
+
+    if exists (select 1 from socio.registro_pileta where id_tarifa = @id)
+    begin
+        raiserror('No se puede eliminar porque está vinculada a registros de pileta.', 16, 1);
+        return;
+    end
+
+    delete from socio.tarifa_pileta where id = @id;
 end
 go
 
@@ -2310,3 +2917,96 @@ end
 go
 
 
+---- Sistema de Débito Automático ----
+-- Procedimiento para procesar débitos automáticos y generar facturas y pagos sin duplicados
+create or alter procedure socio.procesarDebitosAutomaticos
+    @fecha_procesamiento date = null
+as
+begin
+    set nocount on;
+    if @fecha_procesamiento is null
+        set @fecha_procesamiento = getdate();
+
+    if @fecha_procesamiento > getdate()
+    begin
+        raiserror('No se puede procesar débitos automáticos para una fecha futura.', 16, 1);
+        return;
+    end
+
+    declare @cantidad_procesados int = 0;
+    declare @total_procesado decimal(10,2) = 0;
+    declare @cantidad_exitosos int = 0;
+    declare @cantidad_fallidos int = 0;
+
+    begin try
+        begin transaction;
+
+        -- Obtener todos los responsables de débito automático activos (socios y tutores)
+        declare @socios table (id_responsable_pago int, id_cuota int, monto_cuota decimal(8,2), es_tutor bit);
+
+        insert into @socios (id_responsable_pago, id_cuota, monto_cuota, es_tutor)
+        -- Socios responsables de pago
+        select da.id_responsable_pago, c.id, c.monto_total, 0
+        from socio.debito_automatico da
+        inner join socio.socio s on s.id = da.id_responsable_pago and s.responsable_pago = 1
+        inner join socio.cuota c on c.id_socio = s.id
+        where da.activo = 1
+
+        union all
+
+        -- Tutores responsables de pago
+        select da.id_responsable_pago, c.id, c.monto_total, 1
+        from socio.debito_automatico da
+        inner join socio.tutor t on t.id = da.id_responsable_pago
+        inner join socio.socio s on s.id_tutor = t.id
+        inner join socio.cuota c on c.id_socio = s.id
+        where da.activo = 1;
+
+        -- Variables para iterar
+        declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(8,2), @es_tutor bit;
+        declare @id_factura_cuota int, @id_pago int;
+
+        -- Iterar sobre la tabla de responsables adheridos al débito automático
+        while exists (select 1 from @socios)
+        begin
+            select top 1 @id_responsable_pago = id_responsable_pago, @id_cuota = id_cuota, @monto_cuota = monto_cuota, @es_tutor = es_tutor from @socios;
+
+            -- Generar factura de cuota
+            exec socio.altaFacturaCuota @id_cuota = @id_cuota;
+            select @id_factura_cuota = max(id) from socio.factura_cuota where id_cuota = @id_cuota;
+
+            -- Obtener el importe real de la factura (con descuentos)
+            declare @monto_factura decimal(8,2);
+            select @monto_factura = importe_total from socio.factura_cuota where id = @id_factura_cuota;
+
+            -- Generar pago de la factura
+            exec socio.altaPago 
+                @monto = @monto_factura, 
+                @medio_de_pago = 'Débito automático', 
+                @es_debito_automatico = 1,
+                @id_factura_cuota = @id_factura_cuota;
+            select @id_pago = scope_identity();
+
+            set @cantidad_exitosos = @cantidad_exitosos + 1;
+            set @total_procesado = @total_procesado + @monto_cuota;
+            set @cantidad_procesados = @cantidad_procesados + 1;
+
+            delete from @socios where id_responsable_pago = @id_responsable_pago and id_cuota = @id_cuota;
+        end
+
+        commit transaction;
+
+        print '=== DÉBITOS AUTOMÁTICOS PROCESADOS ===';
+        print 'Cantidad total de débitos procesados: ' + cast(@cantidad_procesados as varchar(10));
+        print '  - Débitos exitosos: ' + cast(@cantidad_exitosos as varchar(10));
+        print 'Total procesado: $' + cast(@total_procesado as varchar(15));
+        print '=====================================';
+    end try
+    begin catch
+        rollback transaction;
+        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
+        raiserror('Error al procesar débitos automáticos: %s', 16, 1, @ErrorMessage);
+        return;
+    end catch
+end
+go

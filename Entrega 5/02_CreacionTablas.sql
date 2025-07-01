@@ -146,8 +146,10 @@ go
 create table general.actividad_extra
 (
 	id					int primary key identity(1,1),
+	id_socio			int NOT NULL,
 	nombre				varchar(50) NOT NULL,
 	costo				decimal(8,2) NOT NULL
+	foreign key (id_socio) references socio.socio(id)
 );
 go
 
@@ -185,6 +187,7 @@ create table general.presentismo
 	id_socio		int,
 	id_clase		int NOT NULL,
 	fecha			datetime,
+	tipo_asistencia	varchar(1) NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_clase) references general.clase(id)
 )
@@ -192,10 +195,12 @@ go
 
 create table socio.estado_cuenta
 (
-	id			int primary key identity(1,1),
-	id_socio	int NOT NULL,
-	saldo		decimal(8,2) NOT NULL,
-	foreign key (id_socio) references socio.socio(id)
+	id				int primary key identity(1,1),
+	id_socio		int,
+	id_tutor		int,
+	saldo			decimal(8,2) NOT NULL,
+	foreign key (id_socio) references socio.socio(id),
+	foreign key (id_tutor) references socio.tutor(id)
 );
 go
 
