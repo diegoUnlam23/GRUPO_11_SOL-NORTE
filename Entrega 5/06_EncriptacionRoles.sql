@@ -29,7 +29,7 @@ create role jefe_tesoreria;
 create role admin_cobranza;
 create role admin_morosidad;
 create role admin_facturacion;
-
+go
 
 
 grant control on database::Com2900G11 to presidente;
@@ -43,21 +43,21 @@ grant update on database::Com2900G11 to secretario;
 
 
 grant execute on general.ver_morosos to admin_morosidad;
-grant select on socio.factura to admin_morosidad;
-grant execute on socio.modificarSocio to admin_morosidad;
+grant select on socio.factura_cuota to admin_morosidad;
+grant execute on socio.modificacionSocio to admin_morosidad;
 
-grant execute on socio.altaPago to admin_pago;
-grant execute on socio.modificarPago to admin_pago;
-grant execute on socio.altaReembolso to admin_pago;
-grant execute on socio.modificarReembolso to admin_pago;
-grant select on socio.pago to admin_pago;
-grant select on socio.reembolso to admin_pago;
+
+grant execute on socio.altaPago to admin_cobranza;
+grant execute on socio.altaReembolso to admin_cobranza;
+grant execute on socio.procesarReintegroLluvia to admin_cobranza;
+grant select on socio.pago to admin_cobranza;
+grant select on socio.reembolso to admin_cobranza;
 
 
 grant select on socio.factura_cuota to admin_facturacion;
 grant select on socio.item_factura_cuota to admin_facturacion;
-grant execute on socio.AltaFactura to admin_facturacion;
-grant execute on socio.AltaItemFactura	 to admin_facturacion;
+grant execute on socio.AltaFacturaCuota to admin_facturacion;
+grant execute on socio.AltaItemFacturaCuota	 to admin_facturacion;
 
 grant select on socio.factura_extra to admin_facturacion;
 grant select on socio.item_factura_extra to admin_facturacion;
