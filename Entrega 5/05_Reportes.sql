@@ -1,8 +1,8 @@
 /*
     Consigna: Creacion de Reportes
     Fecha de entrega: 24/06/2025
-    Número de comisión: 2900
-    Número de grupo: 11
+    NÃºmero de comisiÃ³n: 2900
+    NÃºmero de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas
     Integrantes:
         - Costanzo, Marcos Ezequiel - 40955907
@@ -49,7 +49,7 @@ as
 begin
 	with ingreso_mes(actividad,mes,ingresos) as
 	(
-		select a.nombre,MONTH(p.fecha_pago) as mes,sum(ifc.importe_total) as ingresos
+		select a.nombre,MONTH(p.fecha_pago) as mes,sum(a.costo_mensual) as ingresos
 		from general.actividad a 
 		join socio.inscripcion_actividad ia on
 		a.id = ia.id_actividad 
