@@ -18,6 +18,7 @@ go
 	rol		varchar(30) collate modern_spanish_ci_ai
 );*/
 
+--CREACION DE ROLES
 create role presidente;
 create role vicepresidente;
 create role vocal;
@@ -28,7 +29,6 @@ create role jefe_tesoreria;
 create role admin_cobranza;
 create role admin_morosidad;
 create role admin_facturacion;
-
 
 
 
@@ -44,16 +44,23 @@ grant update on database::Com2900G11 to secretario;
 
 grant execute on general.ver_morosos to admin_morosidad;
 grant select on socio.factura to admin_morosidad;
-grant update on socio.socio to admin_morosidad;
+grant execute on socio.modificarSocio to admin_morosidad;
 
-grant control on socio.pago to admin_morosidad;
-grant control on socio.reembolso to admin_morosidad;
+grant execute on socio.altaPago to admin_pago;
+grant execute on socio.modificarPago to admin_pago;
+grant execute on socio.altaReembolso to admin_pago;
+grant execute on socio.modificarReembolso to admin_pago;
+grant select on socio.pago to admin_pago;
+grant select on socio.reembolso to admin_pago;
 
 
-grant control on socio.factura_cuota to admin_facturacion;
-grant control on socio.item_factura_cuota to admin_facturacion;
-grant control on socio.factura_extra to admin_facturacion;
-grant control on socio.item_factura_extra to admin_facturacion;
+grant select on socio.factura_cuota to admin_facturacion;
+grant select on socio.item_factura_cuota to admin_facturacion;
+grant execute on socio.AltaFactura to admin_facturacion;
+grant execute on socio.AltaItemFactura	 to admin_facturacion;
+
+grant select on socio.factura_extra to admin_facturacion;
+grant select on socio.item_factura_extra to admin_facturacion;
 
 
 grant control on socio.socio to admin_socio;
@@ -102,3 +109,54 @@ grant execute on socio.altaInscripcionActividad to socios_web;
 
 
 
+--ENCRIPTACION
+go
+create or alter procedure general.encriptarEmpleado
+	@id int
+as
+begin
+	declare @clave varchar(100) = 'profe_valeria_tutora';  
+	declare @nombre_encriptado varbinary(256);
+	declare @nombre_empleado varchar(150);
+
+	if not exists (select 1 from general.empleado e where e.id = @id)
+	begin
+		raiserror('Empleado inexistente',16,1)
+		return;
+	end
+	select @nombre_empleado = e.nombre from general.empleado e where e.id = @id
+	set @nombre_encriptado = ENCRYPTBYPASSPHRASE(@clave,@nombre_empleado)
+	
+	update general.empleado
+	set 
+		nombre_cifrado =@nombre_encriptado,
+		nombre = NULL
+	where id = @id
+
+end
+go
+create or alter procedure general.desencriptarEmpleado
+	@id int
+as
+begin
+	
+	declare @clave varchar(100) = 'profe_valeria_tutora';  
+	declare @nombre_encriptado varbinary(256);
+	declare @nombre_empleado varchar(150);
+
+	if not exists (select 1 from general.empleado e where e.id = @id)
+	begin
+		raiserror('Empleado inexistente',16,1)
+		return;
+	end 
+	select @nombre_encriptado = e.nombre_cifrado from general.empleado e where e.id = @id
+	set @nombre_empleado = convert(varchar(150),DECRYPTBYPASSPHRASE(@clave,@nombre_encriptado))
+	
+	update general.empleado
+	set 
+		nombre_cifrado =NULL,
+		nombre = @nombre_empleado
+	where id = @id
+
+end
+go
