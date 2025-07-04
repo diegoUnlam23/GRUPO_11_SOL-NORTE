@@ -1,6 +1,6 @@
 /*
     Consigna: Implementar los SP necesarios para cumplir con la lógica del sistema
-    Fecha de entrega: 24/06/2025
+    Fecha de entrega: 08/07/2025
     Número de comisión: 2900
     Número de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas
@@ -177,6 +177,7 @@ go
 ---- Socio ----
 -- Insert
 create or alter procedure socio.altaSocio
+	@nro_socio varchar(50),
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
@@ -198,7 +199,7 @@ begin
         return;
     end
 
-    if @email not like '_%@_%._%'
+    if @email not like '%@%._%'
     begin
         raiserror('El email no tiene un formato válido.', 16, 1);
         return;
@@ -207,8 +208,8 @@ begin
     begin try
         begin transaction;
 
-        insert into socio.socio (nombre, apellido, dni, email, fecha_nacimiento, telefono, telefono_emergencia, id_obra_social_socio, id_tutor, id_grupo_familiar, estado, responsable_pago)
-        values (@nombre, @apellido, @dni, @email, @fecha_nacimiento, @telefono, @telefono_emergencia, @id_obra_social_socio, @id_tutor, @id_grupo_familiar, @estado, @responsable_pago);
+        insert into socio.socio (nro_socio, nombre, apellido, dni, email, fecha_nacimiento, telefono, telefono_emergencia, id_obra_social_socio, id_tutor, id_grupo_familiar, estado, responsable_pago)
+        values (@nro_socio, @nombre, @apellido, @dni, @email, @fecha_nacimiento, @telefono, @telefono_emergencia, @id_obra_social_socio, @id_tutor, @id_grupo_familiar, @estado, @responsable_pago);
 
         declare @id_socio_new int = scope_identity();
 
@@ -905,10 +906,7 @@ go
 -- Insert
 create or alter procedure socio.altaInscripcionActividad
     @id_cuota int,
-    @id_actividad int,
-    @activa bit = 1,
-    @fecha_inscripcion date,
-    @fecha_baja date = null
+    @id_actividad int
 as
 begin
     SET NOCOUNT ON;
@@ -946,8 +944,8 @@ begin
     begin try
         begin transaction;
 
-        insert into socio.inscripcion_actividad (id_cuota, id_actividad, activa, fecha_inscripcion, fecha_baja)
-        values (@id_cuota, @id_actividad, @activa, @fecha_inscripcion, @fecha_baja);
+        insert into socio.inscripcion_actividad (id_cuota, id_actividad)
+        values (@id_cuota, @id_actividad);
 
         -- Actualizar el monto total de la cuota sumandole el precio de la actividad
         --declare @monto_total decimal(8,2);
@@ -997,9 +995,7 @@ begin
     begin try
         begin transaction;
 
-        update socio.inscripcion_actividad
-        set activa = 0,
-            fecha_baja = getdate()
+        delete from socio.inscripcion_actividad
         where id = @id;
 
         -- Actualizar el monto total de la cuota restandole el precio de la actividad
@@ -1121,8 +1117,7 @@ begin
     -- Verificar descuento por múltiples actividades (10% en el total de actividades deportivas)
     select @cantidad_actividades = count(*)
     from socio.inscripcion_actividad ia
-    where ia.id_cuota = @id_cuota
-    and ia.activa = 1;
+    where ia.id_cuota = @id_cuota;
     
     if @cantidad_actividades > 1
     begin
@@ -1190,20 +1185,31 @@ go
 ---- Factura Cuota ----
 -- Insert
 create or alter procedure socio.altaFacturaCuota
-    @id_cuota int
+    @id_cuota int,
+    @fecha_emision date
 as
 begin
-    if not exists (select 1 from socio.cuota where id = @id_cuota)
+    -- Validar que exista la cuota y que el periodo coincida con la fecha enviada
+    declare @anio_param int = year(@fecha_emision);
+    declare @mes_param int = month(@fecha_emision);
+    declare @anio_cuota int;
+    declare @mes_cuota int;
+    select @anio_cuota = anio, @mes_cuota = mes from socio.cuota where id = @id_cuota;
+    if @anio_cuota is null or @mes_cuota is null
     begin
         raiserror('No existe una cuota con ese ID.', 16, 1);
+        return;
+    end
+    if @anio_cuota <> @anio_param or @mes_cuota <> @mes_param
+    begin
+        raiserror('La cuota asociada no corresponde al periodo de la fecha de emisión enviada.', 16, 1);
         return;
     end
 
     -- Generar valores automáticamente
     declare @numero_comprobante int;
     declare @tipo_comprobante varchar(2) = 'B';
-    declare @fecha_emision date = getdate();
-    declare @periodo_facturado int = year(@fecha_emision) * 100 + month(@fecha_emision);
+    declare @periodo_facturado int = @anio_param * 100 + @mes_param;
     declare @iva varchar(50) = '21%';
     declare @fecha_vencimiento_1 date = dateadd(day, 30, @fecha_emision);
     declare @fecha_vencimiento_2 date = dateadd(day, 40, @fecha_emision);
@@ -1297,8 +1303,7 @@ begin
     select @total_actividades = isnull(sum(a.costo_mensual), 0)
     from socio.inscripcion_actividad ia
     inner join general.actividad a on ia.id_actividad = a.id
-    where ia.id_cuota = @id_cuota
-    and ia.activa = 1;
+    where ia.id_cuota = @id_cuota;
 
     -- Calcular descuentos
     declare @descuento_familiar decimal(8,2);
@@ -1421,8 +1426,7 @@ begin
            @cantidad_actividades = count(*)
     from socio.inscripcion_actividad ia
     inner join general.actividad a on ia.id_actividad = a.id
-    where ia.id_cuota = @id_cuota
-    and ia.activa = 1;
+    where ia.id_cuota = @id_cuota;
 
     begin try
         begin transaction;
@@ -1469,8 +1473,7 @@ begin
                 a.costo_mensual - @descuento_familiar_por_actividad
             from socio.inscripcion_actividad ia
             inner join general.actividad a on ia.id_actividad = a.id
-            where ia.id_cuota = @id_cuota
-            and ia.activa = 1;
+            where ia.id_cuota = @id_cuota;
         end
 
         -- Insertar items de descuentos si existen
@@ -1712,6 +1715,13 @@ begin
     declare @id_registro_pileta int;
     declare @id_actividad_extra int;
     declare @es_tutor bit = 0;
+
+    -- Validar medio de pago permitido
+    if @medio_de_pago not in ('Visa', 'MasterCard', 'Tarjeta Naranja', 'Pago Fácil', 'Rapipago', 'Transferencia Mercado Pago')
+    begin
+        raiserror('El medio de pago no es válido. Debe ser: Visa, MasterCard, Tarjeta Naranja, Pago Fácil, Rapipago o Transferencia Mercado Pago.', 16, 1);
+        return;
+    end
 
     -- Determinar el tipo de factura y obtener información
     if @id_factura_cuota is not null

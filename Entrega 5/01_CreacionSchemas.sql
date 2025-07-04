@@ -1,6 +1,6 @@
 /*
     Consigna: Crear los esquemas necesarios para el proyecto
-    Fecha de entrega: 24/06/2025
+    Fecha de entrega: 08/07/2025
     Número de comisión: 2900
     Número de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas

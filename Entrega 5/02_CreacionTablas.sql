@@ -1,6 +1,6 @@
 /*
     Consigna: Crear las tablas requeridas para el modelo de datos del proyecto
-    Fecha de entrega: 24/06/2025
+    Fecha de entrega: 08/07/2025
     Número de comisión: 2900
     Número de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas
@@ -48,6 +48,7 @@ create table socio.socio
 	id_grupo_familiar		int,
 	estado					varchar(20),
 	responsable_pago		bit,
+	nro_socio				varchar(20),
 	foreign key (id_obra_social_socio) references socio.obra_social_socio(id),
 	foreign key (id_tutor) references socio.tutor(id),
 	foreign key (id_grupo_familiar) references socio.socio(id)
@@ -77,8 +78,9 @@ go
 
 create table general.empleado
 (
-	id			int primary key identity(1,1),
-	nombre		varchar(50) NOT NULL,
+	id				int primary key identity(1,1),
+	nombre			varchar(50),
+	nombre_cifrado	varbinary(256)
 );
 go
 
@@ -98,8 +100,11 @@ create table socio.cuota
 	id_socio			int NOT NULL,
 	id_categoria		int NOT NULL,
 	monto_total			decimal(8,2),
+	anio				int NOT NULL,
+	mes					int NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
-	foreign key (id_categoria) references socio.categoria(id)
+	foreign key (id_categoria) references socio.categoria(id),
+	constraint UQ_cuota_socio_cat_periodo UNIQUE (id_socio, anio, mes)
 );
 go
 
@@ -158,11 +163,8 @@ create table socio.inscripcion_actividad
 	id					int primary key identity(1,1),
 	id_cuota			int NOT NULL,
 	id_actividad		int NOT NULL,
-	activa				bit NOT NULL,
-	fecha_inscripcion	datetime NOT NULL,
-	fecha_baja			datetime,
 	foreign key (id_cuota) references socio.cuota(id),
-	foreign key (id_actividad) references general.actividad(id),
+	foreign key (id_actividad) references general.actividad(id)
 );
 go
 
@@ -186,8 +188,8 @@ create table general.presentismo
 	id				int primary key identity(1,1),
 	id_socio		int,
 	id_clase		int NOT NULL,
-	fecha			datetime,
-	tipo_asistencia	varchar(1) NOT NULL,
+	fecha			date,
+	tipo_asistencia	varchar(2) NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_clase) references general.clase(id)
 )
@@ -277,6 +279,7 @@ create table socio.pago
 	es_debito_automatico	bit default 0 NOT NULL,
 	id_factura_cuota		int,
 	id_factura_extra		int,
+	id_pago_externo			bigint,
 	foreign key (id_factura_cuota) references socio.factura_cuota(id),
 	foreign key (id_factura_extra) references socio.factura_extra(id)
 );
