@@ -160,11 +160,11 @@ select @id_socio_martin = id from socio.socio where dni = 34567890;
 select @id_socio_lucia = id from socio.socio where dni = 45678901;
 
 -- Martín: categoría Menor (id_categoria = 1)
-exec socio.altaCuota @id_socio = @id_socio_martin, @id_categoria = 1, @monto_total = 120.00;
+exec socio.altaCuota @id_socio = @id_socio_martin, @id_categoria = 1, @monto_total = 120.00, @mes = 7, @anio = 2025;
 select @id_cuota_martin = max(id) from socio.cuota where id_socio = @id_socio_martin;
 
 -- Lucía: categoría Cadete (id_categoria = 2)
-exec socio.altaCuota @id_socio = @id_socio_lucia, @id_categoria = 2, @monto_total = 150.00;
+exec socio.altaCuota @id_socio = @id_socio_lucia, @id_categoria = 2, @monto_total = 150.00, @mes = 7, @anio = 2025;
 select @id_cuota_lucia = max(id) from socio.cuota where id_socio = @id_socio_lucia;
 
 -- Verificar creación de cuotas
@@ -189,26 +189,24 @@ print '3.4 INSCRIPCIÓN A ACTIVIDADES DEPORTIVAS';
 print 'Inscribiendo a los menores a actividades deportivas...';
 
 -- Martín: Futsal (id_actividad = 1), Natación (id_actividad = 5)
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_martin, @id_actividad = 1, @fecha_inscripcion = '2024-02-01';
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_martin, @id_actividad = 5, @fecha_inscripcion = '2024-02-01';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_martin, @id_actividad = 1;
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_martin, @id_actividad = 5;
 
 -- Lucía: Baile artístico (id_actividad = 4), Ajedrez (id_actividad = 6)
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_lucia, @id_actividad = 4, @fecha_inscripcion = '2024-02-01';
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_lucia, @id_actividad = 6, @fecha_inscripcion = '2024-02-01';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_lucia, @id_actividad = 4;
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_lucia, @id_actividad = 6;
 
 -- Verificar inscripciones
 select 
     'Inscripciones activas' as Estado,
     s.nombre + ' ' + s.apellido as Socio,
     a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual,
-    ia.fecha_inscripcion as Fecha_Inscripcion,
-    case ia.activa when 1 then 'Activa' else 'Inactiva' end as Estado_Inscripcion
+    a.costo_mensual as Costo_Mensual
 from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_martin, @id_cuota_lucia) and ia.activa = 1
+where c.id in (@id_cuota_martin, @id_cuota_lucia)
 order by s.nombre, a.nombre;
 
 print 'Menores inscriptos a actividades deportivas';
@@ -222,12 +220,12 @@ print '3.5 GENERACIÓN DE FACTURA CUOTA (CON DESCUENTO FAMILIAR)';
 print 'Generando factura de cuota para cada menor, aplicando descuento familiar si corresponde...';
 
 -- Martín
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_martin;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_martin, @fecha_emision = '2025-07-04';
 declare @id_factura_cuota_martin int;
 select @id_factura_cuota_martin = max(id) from socio.factura_cuota where id_cuota = @id_cuota_martin;
 
 -- Lucía
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_lucia;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_lucia, @fecha_emision = '2025-07-04';
 declare @id_factura_cuota_lucia int;
 select @id_factura_cuota_lucia = max(id) from socio.factura_cuota where id_cuota = @id_cuota_lucia;
 
@@ -299,10 +297,10 @@ inner join socio.tutor t on ec.id_tutor = t.id
 where ec.id_tutor = @id_tutor_gabriela;
 
 -- Procesar pago de la factura de Martín (por el tutor)
-exec socio.altaPago @monto = @monto_factura_martin, @medio_de_pago = 'Transferencia Bancaria', @id_factura_cuota = @id_factura_cuota_martin;
+exec socio.altaPago @monto = @monto_factura_martin, @medio_de_pago = 'Visa', @id_factura_cuota = @id_factura_cuota_martin;
 
 -- Procesar pago de la factura de Lucía (por el tutor)
-exec socio.altaPago @monto = @monto_factura_lucia, @medio_de_pago = 'Transferencia Bancaria', @id_factura_cuota = @id_factura_cuota_lucia;
+exec socio.altaPago @monto = @monto_factura_lucia, @medio_de_pago = 'Visa', @id_factura_cuota = @id_factura_cuota_lucia;
 
 -- Estado de cuenta del tutor DESPUÉS del pago
 print '';
@@ -409,9 +407,9 @@ inner join socio.tutor t on ec.id_tutor = t.id
 where t.dni = 23456789;
 
 -- Pago de factura extra de Martín
-exec socio.altaPago @monto = @monto_factura_extra_martin, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_extra_martin;
+exec socio.altaPago @monto = @monto_factura_extra_martin, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_extra_martin;
 -- Pago de factura extra de Lucía
-exec socio.altaPago @monto = @monto_factura_extra_lucia, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_extra_lucia;
+exec socio.altaPago @monto = @monto_factura_extra_lucia, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_extra_lucia;
 
 -- Estado de cuenta del tutor DESPUÉS del pago de facturas extra (NO DEBERÍA CAMBIAR)
 print '';
@@ -491,7 +489,7 @@ inner join socio.tutor t on ec.id_tutor = t.id
 where t.dni = 23456789;
 
 -- Pago de factura extra por actividad
-exec socio.altaPago @monto = @monto_factura_extra_actividad, @medio_de_pago = 'Transferencia Mercado Pago', @id_factura_extra = @id_factura_extra_actividad;
+exec socio.altaPago @monto = @monto_factura_extra_actividad, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_extra_actividad;
 
 -- Estado de cuenta del tutor DESPUÉS del pago de factura extra por actividad (NO DEBERÍA CAMBIAR)
 print '';
@@ -814,7 +812,7 @@ select @id_factura_invitado = max(id) from socio.factura_extra where id_registro
 select @monto_invitado = importe_total from socio.factura_extra where id = @id_factura_invitado;
 
 -- Pago inmediato del invitado
-exec socio.altaPago @monto = @monto_invitado, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_invitado;
+exec socio.altaPago @monto = @monto_invitado, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_invitado;
 
 -- Verificar factura y pago
 select 
@@ -894,8 +892,8 @@ order by fc.fecha_emision;
 
 -- Procesar débitos automáticos
 print '';
-print 'Procesando débitos automáticos para la fecha 2024-02-15...';
-exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2024-02-15';
+print 'Procesando débitos automáticos para la fecha 2025-07-15...';
+exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-07-15';
 
 -- Mostrar facturas generadas automáticamente
 print '';
@@ -1029,14 +1027,12 @@ select
     'ACTIVIDADES POR MENOR' as Seccion,
     s.nombre + ' ' + s.apellido as Socio,
     a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual,
-    ia.fecha_inscripcion as Fecha_Inscripcion,
-    case ia.activa when 1 then 'Activa' else 'Inactiva' end as Estado
+    a.costo_mensual as Costo_Mensual
 from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_martin, @id_cuota_lucia) and ia.activa = 1
+where c.id in (@id_cuota_martin, @id_cuota_lucia)
 order by s.nombre, a.nombre;
 
 print 'Resumen de actividades deportivas completado';

@@ -177,7 +177,7 @@ go
 ---- Socio ----
 -- Insert
 create or alter procedure socio.altaSocio
-	@nro_socio varchar(50),
+	@nro_socio varchar(50) = null,
     @nombre varchar(100),
     @apellido varchar(100),
     @dni int,
@@ -203,6 +203,16 @@ begin
     begin
         raiserror('El email no tiene un formato válido.', 16, 1);
         return;
+    end
+
+    -- Generar nro_socio automáticamente si no se envía por parámetro
+    if @nro_socio is null or LTRIM(RTRIM(@nro_socio)) = ''
+    begin
+        declare @ultimo_nro int;
+        select @ultimo_nro = MAX(CAST(SUBSTRING(nro_socio, 4, LEN(nro_socio)) AS INT))
+        from socio.socio
+        where nro_socio like 'SN-%';
+        set @nro_socio = 'SN-' + cast(isnull(@ultimo_nro, 4000) + 1 as varchar);
     end
 
     begin try
@@ -359,6 +369,13 @@ begin
     if not exists (select 1 from socio.socio where id = @id_responsable_pago)
     begin
         raiserror('No existe un socio responsable de pago con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Validar medio de pago permitido
+    if @medio_de_pago not in ('Visa', 'MasterCard', 'Tarjeta Naranja', 'Pago Fácil', 'Rapipago', 'Transferencia Mercado Pago')
+    begin
+        raiserror('El medio de pago no es válido. Debe ser: Visa, MasterCard, Tarjeta Naranja, Pago Fácil, Rapipago, Transferencia Mercado Pago o Débito automático.', 16, 1);
         return;
     end
 
@@ -1023,6 +1040,8 @@ go
 create or alter procedure socio.altaCuota
     @id_socio int,
     @id_categoria int,
+    @mes int,
+    @anio int,
     @monto_total decimal(8,2) = 0
 as
 begin
@@ -1039,8 +1058,14 @@ begin
         return;
     end
 
-    insert into socio.cuota (id_socio, id_categoria, monto_total)
-    values (@id_socio, @id_categoria, @monto_total);
+    if exists (select 1 from socio.cuota where id_socio = @id_socio and mes = @mes and anio = @anio)
+    begin
+        raiserror('Ya existe una cuota para ese socio en ese mes y año.', 16, 1);
+        return;
+    end
+
+    insert into socio.cuota (id_socio, id_categoria, mes, anio, monto_total)
+    values (@id_socio, @id_categoria, @mes, @anio, @monto_total);
 end
 go
 
@@ -2876,11 +2901,11 @@ begin
     if @fecha_procesamiento is null
         set @fecha_procesamiento = getdate();
 
-    if @fecha_procesamiento > getdate()
+    /*if @fecha_procesamiento > getdate()
     begin
         raiserror('No se puede procesar débitos automáticos para una fecha futura.', 16, 1);
         return;
-    end
+    end*/
 
     declare @cantidad_procesados int = 0;
     declare @total_procesado decimal(10,2) = 0;
@@ -2891,11 +2916,11 @@ begin
         begin transaction;
 
         -- Obtener todos los responsables de débito automático activos (socios y tutores)
-        declare @socios table (id_responsable_pago int, id_cuota int, monto_cuota decimal(8,2), es_tutor bit);
+        declare @socios table (id_responsable_pago int, id_cuota int, monto_cuota decimal(8,2), es_tutor bit, medio_de_pago varchar(50));
 
-        insert into @socios (id_responsable_pago, id_cuota, monto_cuota, es_tutor)
+        insert into @socios (id_responsable_pago, id_cuota, monto_cuota, es_tutor, medio_de_pago)
         -- Socios responsables de pago
-        select da.id_responsable_pago, c.id, c.monto_total, 0
+        select da.id_responsable_pago, c.id, c.monto_total, 0, da.medio_de_pago
         from socio.debito_automatico da
         inner join socio.socio s on s.id = da.id_responsable_pago and s.responsable_pago = 1
         inner join socio.cuota c on c.id_socio = s.id
@@ -2904,7 +2929,7 @@ begin
         union all
 
         -- Tutores responsables de pago
-        select da.id_responsable_pago, c.id, c.monto_total, 1
+        select da.id_responsable_pago, c.id, c.monto_total, 1, da.medio_de_pago
         from socio.debito_automatico da
         inner join socio.tutor t on t.id = da.id_responsable_pago
         inner join socio.socio s on s.id_tutor = t.id
@@ -2912,16 +2937,16 @@ begin
         where da.activo = 1;
 
         -- Variables para iterar
-        declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(8,2), @es_tutor bit;
+        declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(8,2), @es_tutor bit, @medio_de_pago varchar(50);
         declare @id_factura_cuota int, @id_pago int;
 
         -- Iterar sobre la tabla de responsables adheridos al débito automático
         while exists (select 1 from @socios)
         begin
-            select top 1 @id_responsable_pago = id_responsable_pago, @id_cuota = id_cuota, @monto_cuota = monto_cuota, @es_tutor = es_tutor from @socios;
+            select top 1 @id_responsable_pago = id_responsable_pago, @id_cuota = id_cuota, @monto_cuota = monto_cuota, @es_tutor = es_tutor, @medio_de_pago = medio_de_pago from @socios;
 
             -- Generar factura de cuota
-            exec socio.altaFacturaCuota @id_cuota = @id_cuota;
+            exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_procesamiento;
             select @id_factura_cuota = max(id) from socio.factura_cuota where id_cuota = @id_cuota;
 
             -- Obtener el importe real de la factura (con descuentos)
@@ -2931,7 +2956,7 @@ begin
             -- Generar pago de la factura
             exec socio.altaPago 
                 @monto = @monto_factura, 
-                @medio_de_pago = 'Débito automático', 
+                @medio_de_pago = @medio_de_pago, 
                 @es_debito_automatico = 1,
                 @id_factura_cuota = @id_factura_cuota;
             select @id_pago = scope_identity();

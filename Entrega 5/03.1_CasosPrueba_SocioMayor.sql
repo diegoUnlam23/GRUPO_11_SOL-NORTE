@@ -132,7 +132,7 @@ print 'Creando cuota para el socio...';
 declare @id_socio_pedro int, @id_cuota_pedro int;
 select @id_socio_pedro = id from socio.socio where dni = 12345678;
 
-exec socio.altaCuota @id_socio = @id_socio_pedro, @id_categoria = 3, @monto_total = 200.00;
+exec socio.altaCuota @id_socio = @id_socio_pedro, @id_categoria = 3, @monto_total = 200.00, @mes = 7, @anio = 2025;
 select @id_cuota_pedro = max(id) from socio.cuota where id_socio = @id_socio_pedro;
 
 -- Verificar creación de la cuota
@@ -157,15 +157,15 @@ print '1.3 INSCRIPCIÓN A ACTIVIDADES DEPORTIVAS';
 print 'Inscribiendo a Pedro Martínez a múltiples actividades deportivas...';
 
 -- Inscribir a Futsal
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 1, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 1;
 print 'Inscripción a Futsal completada';
 
 -- Inscribir a Natación
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 5, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 5;
 print 'Inscripción a Natación completada';
 
 -- Inscribir a Ajedrez
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 6, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_pedro, @id_actividad = 6;
 print 'Inscripción a Ajedrez completada';
 
 -- Verificar inscripciones
@@ -173,14 +173,12 @@ select
     'Inscripciones activas' as Estado,
     s.nombre + ' ' + s.apellido as Socio,
     a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual,
-    ia.fecha_inscripcion as Fecha_Inscripcion,
-    case ia.activa when 1 then 'Activa' else 'Inactiva' end as Estado_Inscripcion
+    a.costo_mensual as Costo_Mensual
 from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id = @id_cuota_pedro and ia.activa = 1
+where c.id = @id_cuota_pedro
 order by a.nombre;
 
 print 'Pedro Martínez inscrito a 3 actividades deportivas (Futsal, Natación, Ajedrez)';
@@ -194,7 +192,7 @@ print '';
 print '1.4 CREACIÓN DE FACTURA CUOTA';
 print 'Generando factura cuota con descuentos aplicados...';
 
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_pedro;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_pedro, @fecha_emision = '2025-07-04';
 
 -- Verificar factura creada
 declare @id_factura_cuota_pedro int;
@@ -710,12 +708,12 @@ order by fc.fecha_emision;
 
 -- Procesar débitos automáticos (primera vez)
 print '';
-print 'Procesando débitos automáticos para la fecha 2024-01-15 (primera vez)...';
-exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2024-01-15';
+print 'Procesando débitos automáticos para la fecha 2025-07-15';
+exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-07-15';
 
 -- Mostrar facturas de cuota DESPUÉS del primer procesamiento
 print '';
-print '--- FACTURAS DE CUOTA DESPUÉS DEL PRIMER DÉBITO AUTOMÁTICO ---';
+print '--- FACTURAS DE CUOTA DESPUÉS DEL DÉBITO AUTOMÁTICO ---';
 select 
     'Facturas después del débito automático' as Estado,
     fc.id as ID_Factura,
@@ -1102,8 +1100,8 @@ inner join socio.socio s on ec.id_socio = s.id
 where ec.id_socio = @id_socio_pedro;
 
 print '';
-print 'Procesando pago de $' + cast(@monto_invitado as varchar(10)) + ' en efectivo por invitado...';
-exec socio.altaPago @monto = @monto_invitado, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_invitado;
+print 'Procesando pago de $' + cast(@monto_invitado as varchar(10)) + ' con tarjeta Visa por invitado...';
+exec socio.altaPago @monto = @monto_invitado, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_invitado;
 
 -- Mostrar estado de cuenta DESPUÉS del pago del invitado
 print '';
@@ -1174,12 +1172,11 @@ where s.id = @id_socio_pedro;
 select 
     'ACTIVIDADES INSCRITO' as Seccion,
     a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual,
-    ia.fecha_inscripcion as Fecha_Inscripcion
+    a.costo_mensual as Costo_Mensual
 from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id = @id_cuota_pedro and ia.activa = 1
+where c.id = @id_cuota_pedro
 order by a.nombre;
 
 -- Resumen de facturas

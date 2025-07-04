@@ -162,17 +162,17 @@ print '2.2 CREACIÓN DE CUOTAS';
 print 'Creando cuotas para cada miembro de la familia...';
 
 -- Crear cuota para el padre (categoría Mayor)
-exec socio.altaCuota @id_socio = @id_padre, @id_categoria = 3, @monto_total = 200.00;
+exec socio.altaCuota @id_socio = @id_padre, @id_categoria = 3, @monto_total = 200.00, @mes = 7, @anio = 2025;
 declare @id_cuota_padre int;
 select @id_cuota_padre = max(id) from socio.cuota where id_socio = @id_padre;
 
 -- Crear cuota para el hijo (categoría Cadete)
-exec socio.altaCuota @id_socio = @id_hijo1, @id_categoria = 2, @monto_total = 150.00;
+exec socio.altaCuota @id_socio = @id_hijo1, @id_categoria = 2, @monto_total = 150.00, @mes = 7, @anio = 2025;
 declare @id_cuota_hijo int;
 select @id_cuota_hijo = max(id) from socio.cuota where id_socio = @id_hijo1;
 
 -- Crear cuota para la hija (categoría Menor)
-exec socio.altaCuota @id_socio = @id_hija, @id_categoria = 1, @monto_total = 120.00;
+exec socio.altaCuota @id_socio = @id_hija, @id_categoria = 1, @monto_total = 120.00, @mes = 7, @anio = 2025;
 declare @id_cuota_hija int;
 select @id_cuota_hija = max(id) from socio.cuota where id_socio = @id_hija;
 
@@ -199,18 +199,18 @@ print '2.3 INSCRIPCIÓN A ACTIVIDADES DEPORTIVAS';
 print 'Inscribiendo a los miembros de la familia a actividades deportivas...';
 
 -- Padre: Futsal y Natación
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_padre, @id_actividad = 1, @fecha_inscripcion = '2024-01-15';
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_padre, @id_actividad = 5, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_padre, @id_actividad = 1;
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_padre, @id_actividad = 5;
 print 'Roberto inscrito a Futsal y Natación';
 
 -- Hijo: Vóley y Taekwondo
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hijo, @id_actividad = 2, @fecha_inscripcion = '2024-01-15';
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hijo, @id_actividad = 3, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hijo, @id_actividad = 2;
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hijo, @id_actividad = 3;
 print 'Tomás inscrito a Vóley y Taekwondo';
 
 -- Hija: Baile artístico y Ajedrez
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hija, @id_actividad = 4, @fecha_inscripcion = '2024-01-15';
-exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hija, @id_actividad = 6, @fecha_inscripcion = '2024-01-15';
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hija, @id_actividad = 4;
+exec socio.altaInscripcionActividad @id_cuota = @id_cuota_hija, @id_actividad = 6;
 print 'Sofía inscrita a Baile artístico y Ajedrez';
 
 -- Verificar inscripciones
@@ -218,13 +218,12 @@ select
     'Inscripciones activas' as Estado,
     s.nombre + ' ' + s.apellido as Socio,
     a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual,
-    ia.fecha_inscripcion as Fecha_Inscripcion
+    a.costo_mensual as Costo_Mensual
 from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija) and ia.activa = 1
+where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
 order by s.fecha_nacimiento, a.nombre;
 
 print 'Todos los miembros de la familia inscritos a 2 actividades cada uno';
@@ -239,17 +238,17 @@ print '2.4 CREACIÓN DE FACTURAS CUOTA';
 print 'Generando facturas cuota para cada miembro con descuentos aplicados...';
 
 -- Generar factura para el padre
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_padre;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_padre, @fecha_emision = '2025-07-04';
 declare @id_factura_padre int;
 select @id_factura_padre = max(id) from socio.factura_cuota where id_cuota = @id_cuota_padre;
 
 -- Generar factura para el hijo
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_hijo;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_hijo, @fecha_emision = '2025-07-04';
 declare @id_factura_hijo int;
 select @id_factura_hijo = max(id) from socio.factura_cuota where id_cuota = @id_cuota_hijo;
 
 -- Generar factura para la hija
-exec socio.altaFacturaCuota @id_cuota = @id_cuota_hija;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_hija, @fecha_emision = '2025-07-04';
 declare @id_factura_hija int;
 select @id_factura_hija = max(id) from socio.factura_cuota where id_cuota = @id_cuota_hija;
 
@@ -423,8 +422,8 @@ select @monto_factura_tomas = importe_total from socio.factura_extra where id = 
 select @monto_factura_sofia = importe_total from socio.factura_extra where id = @id_factura_sofia;
 
 -- Procesar pagos inmediatos
-exec socio.altaPago @monto = @monto_factura_tomas, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_tomas;
-exec socio.altaPago @monto = @monto_factura_sofia, @medio_de_pago = 'Efectivo', @id_factura_extra = @id_factura_sofia;
+exec socio.altaPago @monto = @monto_factura_tomas, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_tomas;
+exec socio.altaPago @monto = @monto_factura_sofia, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_sofia;
 
 -- Verificar pagos de facturas extra
 select 
@@ -501,7 +500,7 @@ from socio.inscripcion_actividad ia
 inner join socio.cuota c on ia.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija) and ia.activa = 1
+where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
 order by s.fecha_nacimiento, a.nombre;
 
 -- Resumen de facturas generadas
