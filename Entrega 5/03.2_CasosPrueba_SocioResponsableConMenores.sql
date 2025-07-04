@@ -46,23 +46,23 @@ exec general.altaEmpleado @nombre = 'Carlos Rodríguez';
 
 -- 3. Insertar categorías
 print '3. Insertando categorías...';
-exec socio.altaCategoria @nombre = 'Menor', @costo_mensual = 120.00, @edad_min = 0, @edad_max = 12;
-exec socio.altaCategoria @nombre = 'Cadete', @costo_mensual = 150.00, @edad_min = 13, @edad_max = 17;
-exec socio.altaCategoria @nombre = 'Mayor', @costo_mensual = 200.00, @edad_min = 18, @edad_max = 120;
+exec socio.altaCategoria @nombre = 'Menor', @costo_mensual = 10000.00, @edad_min = 0, @edad_max = 12;
+exec socio.altaCategoria @nombre = 'Cadete', @costo_mensual = 15000.00, @edad_min = 13, @edad_max = 17;
+exec socio.altaCategoria @nombre = 'Mayor', @costo_mensual = 25000.00, @edad_min = 18, @edad_max = 120;
 
 -- 4. Insertar actividades deportivas
 print '4. Insertando actividades deportivas...';
-exec general.altaActividad @nombre = 'Futsal', @costo_mensual = 80.00;
-exec general.altaActividad @nombre = 'Vóley', @costo_mensual = 70.00;
-exec general.altaActividad @nombre = 'Taekwondo', @costo_mensual = 90.00;
-exec general.altaActividad @nombre = 'Baile artístico', @costo_mensual = 85.00;
-exec general.altaActividad @nombre = 'Natación', @costo_mensual = 75.00;
-exec general.altaActividad @nombre = 'Ajedrez', @costo_mensual = 60.00;
+exec general.altaActividad @nombre = 'Futsal', @costo_mensual = 25000.00;
+exec general.altaActividad @nombre = 'Vóley', @costo_mensual = 30000.00;
+exec general.altaActividad @nombre = 'Taekwondo', @costo_mensual = 250000.00;
+exec general.altaActividad @nombre = 'Baile artístico', @costo_mensual = 30000.00;
+exec general.altaActividad @nombre = 'Natación', @costo_mensual = 45000.00;
+exec general.altaActividad @nombre = 'Ajedrez', @costo_mensual = 2000.00;
 
 -- 5. Insertar tarifas de pileta
 print '5. Insertando tarifas de pileta...';
-exec socio.altaTarifaPileta @tipo = 'Socio', @precio = 20.00;
-exec socio.altaTarifaPileta @tipo = 'Invitado', @precio = 50.00;
+exec socio.altaTarifaPileta @tipo = 'Socio', @precio = 25000.00;
+exec socio.altaTarifaPileta @tipo = 'Invitado', @precio = 30000.00;
 
 -- 6. Insertar obras sociales
 print '6. Insertando obras sociales...';
@@ -126,7 +126,8 @@ select
     dni as DNI,
     fecha_nacimiento as Fecha_Nacimiento,
     estado as Estado_Socio,
-    case responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago
+    case responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago,
+    nro_socio as Nro_Socio
 from socio.socio 
 where dni in (23456789, 34567890, 45678901)
 order by fecha_nacimiento;
@@ -136,7 +137,9 @@ select
     'Grupo familiar asociado' as Estado,
     sr.nombre + ' ' + sr.apellido as Responsable,
     sm.nombre + ' ' + sm.apellido as Menor,
-    sm.id_grupo_familiar as ID_Grupo_Familiar
+    sm.id_grupo_familiar as ID_Grupo_Familiar,
+    sr.nro_socio as Nro_Socio_Responsable,
+    sm.nro_socio as Nro_Socio_Menor
 from socio.socio sr
 inner join socio.socio sm on sr.id = sm.id_grupo_familiar
 where sr.dni = 23456789;
@@ -483,7 +486,9 @@ select
     s.fecha_nacimiento as Fecha_Nacimiento,
     c.nombre as Categoria,
     cu.monto_total as Monto_Cuota,
-    case s.responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago
+    case s.responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago,
+    s.nro_socio as Nro_Socio,
+    sm.nro_socio as Nro_Socio_Menor
 from socio.socio s
 inner join socio.cuota cu on s.id = cu.id_socio
 inner join socio.categoria c on cu.id_categoria = c.id

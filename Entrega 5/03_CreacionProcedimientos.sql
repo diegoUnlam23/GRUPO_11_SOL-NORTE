@@ -3049,3 +3049,228 @@ begin
     print 'Limpieza completada exitosamente';
 end
 GO
+
+
+-- Procedimiento para dar de baja un socio de un grupo familiar
+create or alter procedure socio.bajaSocioDeGrupoFamiliar
+    @id_socio int,
+    @nuevo_responsable_pago int = null   -- ID del nuevo socio responsable o tutor
+as
+begin
+    SET NOCOUNT ON;
+    
+    -- Validar que el socio existe
+    if not exists (select 1 from socio.socio where id = @id_socio)
+    begin
+        raiserror('No existe un socio con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Obtener información del socio
+    declare @nombre_socio varchar(100), @apellido_socio varchar(100);
+    declare @fecha_nacimiento date, @edad int;
+    declare @id_grupo_familiar_actual int, @responsable_pago_actual bit;
+    declare @id_tutor_actual int;
+    declare @fecha_actual date = getdate();
+
+    select @nombre_socio = nombre,
+           @apellido_socio = apellido,
+           @fecha_nacimiento = fecha_nacimiento,
+           @id_grupo_familiar_actual = id_grupo_familiar,
+           @responsable_pago_actual = responsable_pago,
+           @id_tutor_actual = id_tutor
+    from socio.socio
+    where id = @id_socio;
+
+    -- Calcular edad
+    set @edad = datediff(YEAR, @fecha_nacimiento, @fecha_actual);
+    if dateadd(year, @edad, @fecha_nacimiento) > cast(@fecha_actual as date)
+        set @edad = @edad - 1;
+
+    -- Validar que el socio está en un grupo familiar
+    if @id_grupo_familiar_actual is null
+    begin
+        raiserror('El socio no pertenece a ningún grupo familiar.', 16, 1);
+        return;
+    end
+
+    -- Validar que no es el responsable del grupo familiar
+    if @id_socio = @id_grupo_familiar_actual
+    begin
+        raiserror('No se puede dar de baja al responsable del grupo familiar. Primero debe asignar un nuevo responsable.', 16, 1);
+        return;
+    end
+
+    -- Para menores de edad, validar que se proporcione un nuevo responsable
+    if @edad < 18
+    begin
+        if @nuevo_responsable_pago is null
+        begin
+            raiserror('Para socios menores de edad, debe proporcionar un nuevo responsable de pago (socio o tutor).', 16, 1);
+            return;
+        end
+
+        -- Determinar automáticamente si el nuevo responsable es tutor o socio
+        declare @es_tutor bit = 0;
+        declare @es_socio bit = 0;
+        
+        -- Verificar si es tutor
+        if exists (select 1 from socio.tutor where id = @nuevo_responsable_pago)
+        begin
+            set @es_tutor = 1;
+        end
+        -- Verificar si es socio
+        else if exists (select 1 from socio.socio where id = @nuevo_responsable_pago)
+        begin
+            set @es_socio = 1;
+            
+            -- Validar que el nuevo socio responsable es mayor de edad
+            declare @edad_nuevo_responsable int;
+            declare @fecha_nacimiento_nuevo date;
+            
+            select @fecha_nacimiento_nuevo = fecha_nacimiento
+            from socio.socio
+            where id = @nuevo_responsable_pago;
+
+            set @edad_nuevo_responsable = datediff(YEAR, @fecha_nacimiento_nuevo, @fecha_actual);
+            if dateadd(year, @edad_nuevo_responsable, @fecha_nacimiento_nuevo) > cast(@fecha_actual as date)
+                set @edad_nuevo_responsable = @edad_nuevo_responsable - 1;
+
+            if @edad_nuevo_responsable < 18
+            begin
+                raiserror('El nuevo socio responsable debe ser mayor de edad.', 16, 1);
+                return;
+            end
+        end
+        else
+        begin
+            raiserror('No existe un socio o tutor con ese ID.', 16, 1);
+            return;
+        end
+    end
+
+    begin try
+        begin transaction;
+
+        -- Actualizar el socio según su edad
+        if @edad < 18
+        begin
+            -- Para menores: asignar nuevo responsable y quitar del grupo familiar
+            if @es_tutor = 1
+            begin
+                -- Asignar tutor como responsable
+                update socio.socio
+                set id_grupo_familiar = null,
+                    id_tutor = @nuevo_responsable_pago,
+                    responsable_pago = 0
+                where id = @id_socio;
+
+                -- Crear estado de cuenta para el tutor si no existe
+                if not exists (select 1 from socio.estado_cuenta where id_tutor = @nuevo_responsable_pago)
+                begin
+                    exec socio.altaEstadoCuenta @id_tutor = @nuevo_responsable_pago, @saldo = 0;
+                end
+            end
+            else
+            begin
+                -- Asignar nuevo socio como responsable
+                update socio.socio
+                set id_grupo_familiar = @nuevo_responsable_pago,
+                    id_tutor = null,
+                    responsable_pago = 0
+                where id = @id_socio;
+
+                -- Crear estado de cuenta para el nuevo socio responsable si no existe
+                if not exists (select 1 from socio.estado_cuenta where id_socio = @nuevo_responsable_pago)
+                begin
+                    exec socio.altaEstadoCuenta @id_socio = @nuevo_responsable_pago, @saldo = 0;
+                end
+            end
+        end
+        else
+        begin
+            -- Para mayores: hacer responsable de pago y quitar del grupo familiar
+            update socio.socio
+            set id_grupo_familiar = null,
+                id_tutor = null,
+                responsable_pago = 1
+            where id = @id_socio;
+
+            -- Crear estado de cuenta para el socio si no existe
+            if not exists (select 1 from socio.estado_cuenta where id_socio = @id_socio)
+            begin
+                exec socio.altaEstadoCuenta @id_socio = @id_socio, @saldo = 0;
+            end
+        end
+
+        commit transaction;
+    end try
+    begin catch
+        rollback transaction;
+        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
+        raiserror('Error al dar de baja el socio del grupo familiar: %s', 16, 1, @ErrorMessage);
+        return;
+    end catch
+end
+go
+
+
+-- Procedimiento para cambiar el responsable de un grupo familiar
+create or alter procedure socio.cambiarResponsableGrupoFamiliar
+    @id_grupo_familiar int,
+    @nuevo_responsable int
+as
+begin
+    SET NOCOUNT ON;
+    
+    -- Validar que el grupo familiar existe
+    if not exists (select 1 from socio.socio where id_grupo_familiar = @id_grupo_familiar)
+    begin
+        raiserror('No existe un grupo familiar con ese ID.', 16, 1);
+        return;
+    end
+    
+    -- Validar que el nuevo responsable existe
+    if not exists (select 1 from socio.socio where id = @nuevo_responsable)
+    begin
+        raiserror('No existe un socio o tutor con ese ID.', 16, 1);
+        return;
+    end
+    
+    -- Validar que el nuevo responsable no es el responsable actual
+    if @id_grupo_familiar = @nuevo_responsable
+    begin
+        raiserror('El nuevo responsable no puede ser el mismo que el responsable actual.', 16, 1);
+        return;
+    end
+
+    -- Verificar que el nuevo responsable no es menor de edad
+    declare @edad_nuevo_responsable int;
+    declare @fecha_nacimiento_nuevo date;
+    declare @fecha_actual date = getdate();
+    select @fecha_nacimiento_nuevo = fecha_nacimiento
+    from socio.socio
+    where id = @nuevo_responsable;
+    
+    set @edad_nuevo_responsable = datediff(YEAR, @fecha_nacimiento_nuevo, @fecha_actual);
+    if dateadd(year, @edad_nuevo_responsable, @fecha_nacimiento_nuevo) > cast(@fecha_actual as date)
+        set @edad_nuevo_responsable = @edad_nuevo_responsable - 1;
+
+    if @edad_nuevo_responsable < 18
+    begin
+        raiserror('El nuevo responsable debe ser mayor de edad.', 16, 1);
+        return;
+    end
+    
+    -- Actualizar el responsable del grupo familiar
+    update socio.socio
+    set id_grupo_familiar = @nuevo_responsable
+    where id_grupo_familiar = @id_grupo_familiar;
+
+    -- Actualizar el estado de cuenta del nuevo responsable
+    if not exists (select 1 from socio.estado_cuenta where id_socio = @nuevo_responsable)
+    begin
+        exec socio.altaEstadoCuenta @id_socio = @nuevo_responsable, @saldo = 0;
+    end
+end
+go

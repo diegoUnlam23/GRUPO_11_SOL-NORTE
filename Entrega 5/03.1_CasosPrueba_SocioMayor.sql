@@ -106,7 +106,8 @@ select
     email as Email,
     fecha_nacimiento as Fecha_Nacimiento,
     estado as Estado_Socio,
-    case responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago
+    case responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago,
+    nro_socio as Nro_Socio
 from socio.socio 
 where dni = 12345678;
 
@@ -1162,7 +1163,8 @@ select
     s.estado as Estado,
     case s.responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago,
     c.nombre as Categoria,
-    cu.monto_total as Monto_Cuota
+    cu.monto_total as Monto_Cuota,
+    s.nro_socio as Nro_Socio
 from socio.socio s
 inner join socio.cuota cu on s.id = cu.id_socio
 inner join socio.categoria c on cu.id_categoria = c.id
