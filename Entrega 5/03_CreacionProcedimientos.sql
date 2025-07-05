@@ -889,6 +889,37 @@ begin
         return;
     end
 
+    -- Verificamos que la categoría del socio sea la misma que la categoría de la clase
+    declare @fecha_actual date = getdate();
+    declare @fecha_nacimiento_socio date;
+    select @fecha_nacimiento_socio = fecha_nacimiento
+    from socio.socio
+    where id = @id_socio;
+
+    declare @edad_socio int;
+    set @edad_socio = datediff(YEAR, @fecha_nacimiento_socio, @fecha_actual);
+    if dateadd(year, @edad_socio, @fecha_nacimiento_socio) > cast(@fecha_actual as date)
+        set @edad_socio = @edad_socio - 1;
+
+    -- Buscamos la categoria del socio
+    declare @id_categoria_socio int;
+    select @id_categoria_socio = id_categoria
+    from socio.socio
+    where id = @id_socio;
+
+    -- Buscamos la categoria de la clase
+    declare @id_categoria_clase int;
+    select @id_categoria_clase = id_categoria
+    from general.clase
+    where id = @id_clase;
+
+    -- Verificamos que el socio tenga la misma categoría que la clase
+    if @id_categoria_socio <> @id_categoria_clase
+    begin
+        raiserror('El socio no tiene la misma categoría que la clase.', 16, 1);
+        return;
+    end
+
     insert into general.presentismo (id_socio, id_clase, fecha, tipo_asistencia)
     values (@id_socio, @id_clase, @fecha, @tipo_asistencia);
 end
@@ -970,7 +1001,7 @@ begin
         set @monto_total = @monto_total + @precio_actividad;
 
         -- Llamado al procedimiento para actualizar el monto total de la cuota
-        exec socio.modificacionCuota @id_cuota, @monto_total;
+        exec socio.modificacionMontoCuota @id_cuota, @monto_total;
 
         commit transaction;
     end try
@@ -987,21 +1018,34 @@ go
 
 -- Delete
 create or alter procedure socio.bajaInscripcionActividad
-    @id int
+    @id_cuota int,
+    @id_actividad int
 as
 begin
     SET NOCOUNT ON;
-    if not exists (select 1 from socio.inscripcion_actividad where id = @id)
+    -- Verificamos que la cuota exista
+    if not exists (select 1 from socio.cuota where id = @id_cuota)
+    begin
+        raiserror('No existe una cuota con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Verificamos que la actividad exista
+    if not exists (select 1 from general.actividad where id = @id_actividad)
+    begin
+        raiserror('No existe una actividad con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Verificamos que la inscripción a actividad exista
+    if not exists (select 1 from socio.inscripcion_actividad where id_cuota = @id_cuota and id_actividad = @id_actividad)
     begin
         raiserror('No existe una inscripción a actividad con ese ID.', 16, 1);
         return;
     end
 
-    declare @id_cuota int;
-    select @id_cuota = id_cuota from socio.inscripcion_actividad where id = @id;
-
     declare @precio_actividad decimal(8,2);
-    select @precio_actividad = costo_mensual from general.actividad where id = (select id_actividad from socio.inscripcion_actividad where id = @id);
+    select @precio_actividad = costo_mensual from general.actividad where id = @id_actividad;
 
     if @precio_actividad is null
     begin
@@ -1013,7 +1057,7 @@ begin
         begin transaction;
 
         delete from socio.inscripcion_actividad
-        where id = @id;
+        where id_cuota = @id_cuota and id_actividad = @id_actividad;
 
         -- Actualizar el monto total de la cuota restandole el precio de la actividad
         declare @monto_total decimal(8,2);
@@ -1021,7 +1065,7 @@ begin
         set @monto_total = @monto_total - @precio_actividad;
 
         -- Llamado al procedimiento para actualizar el monto total de la cuota
-        exec socio.modificacionCuota @id_cuota, @monto_total;
+        exec socio.modificacionMontoCuota @id_cuota, @monto_total;
 
         commit transaction;
     end try
@@ -1070,7 +1114,7 @@ end
 go
 
 -- Update
-create or alter procedure socio.modificacionCuota
+create or alter procedure socio.modificacionMontoCuota
     @id int,
     @monto_total decimal(8,2)
 as
@@ -1214,6 +1258,13 @@ create or alter procedure socio.altaFacturaCuota
     @fecha_emision date
 as
 begin
+    -- Validamos que el socio esté activo
+    if not exists (select 1 from socio.socio where id = (select id_socio from socio.cuota where id = @id_cuota) and estado = 'Activo')
+    begin
+        raiserror('El socio no está activo.', 16, 1);
+        return;
+    end
+
     -- Validar que exista la cuota y que el periodo coincida con la fecha enviada
     declare @anio_param int = year(@fecha_emision);
     declare @mes_param int = month(@fecha_emision);
@@ -1980,6 +2031,9 @@ begin
         );
         set @id_pago = scope_identity();
 
+        -- Llamamos al procedimiento para generar la cuota del próximo mes copiando las mismas actividades, monto, etc
+        exec socio.copiarCuota @id_cuota = @id_cuota, @mes = @mes_actual, @anio = @anio_actual;
+
         -- Actualizar saldo según el tipo de usuario
         if @es_invitado = 1
         begin
@@ -2705,6 +2759,22 @@ begin
 end
 go
 
+create or alter procedure socio.modificarPrecioCategoria
+    @id int,
+    @costo_mensual decimal(8,2)
+as
+begin
+    if not exists (select 1 from socio.categoria where id = @id)
+    begin
+        raiserror('No existe una categoría con ese ID.', 16, 1);
+        return;
+    end
+
+    update socio.categoria
+    set costo_mensual = @costo_mensual
+    where id = @id;
+end
+
 -- Delete
 create or alter procedure socio.bajaCategoria
     @id int
@@ -3272,5 +3342,135 @@ begin
     begin
         exec socio.altaEstadoCuenta @id_socio = @nuevo_responsable, @saldo = 0;
     end
+end
+go
+
+
+-- Procedimiento para copiar una cuota
+create or alter procedure socio.copiarCuota
+    @id_cuota int
+as
+begin
+    SET NOCOUNT ON;
+
+    declare @mes_siguiente int;
+    declare @anio_siguiente int;
+
+    select @mes = mes, @anio = anio
+    from socio.cuota
+    where id = @id_cuota;
+
+    if @mes = 12
+    begin
+        set @mes_siguiente = 1;
+        set @anio_siguiente = @anio + 1;
+    end
+    else
+    begin
+        set @mes_siguiente = @mes + 1;
+        set @anio_siguiente = @anio;
+    end
+    
+    -- Validar que la cuota existe
+    if not exists (select 1 from socio.cuota where id = @id_cuota)
+    begin
+        raiserror('No existe una cuota con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Obtener información de la cuota
+    declare @id_socio int;
+    declare @id_categoria int;
+    declare @mes int;
+    declare @anio int;
+    declare @monto_total decimal(8,2);
+
+    select @id_socio = id_socio,
+           @id_categoria = id_categoria,
+           @mes = mes,
+           @anio = anio,
+           @monto_total = monto_total
+    from socio.cuota
+    where id = @id_cuota;
+
+    -- Verificar que la cuota anterior esté pagada
+    if not exists (
+        select 1 from socio.factura_cuota fc 
+        inner join socio.pago p on fc.id = p.id_factura_cuota 
+        where fc.id_cuota = @id_cuota
+    )
+    begin
+        raiserror('No se puede copiar una cuota que no está pagada.', 16, 1);
+        return;
+    end
+
+    -- Verificar que no exista ya una cuota para el mes siguiente
+    if exists (select 1 from socio.cuota where id_socio = @id_socio and mes = @mes_siguiente and anio = @anio_siguiente)
+    begin
+        raiserror('Ya existe una cuota para el mes siguiente.', 16, 1);
+        return;
+    end
+
+    begin try
+        begin transaction;
+
+            -- Copiar la cuota
+            insert into socio.cuota (id_socio, id_categoria, mes, anio, monto_total)
+            select @id_socio, @id_categoria, @mes_siguiente, @anio_siguiente, @monto_total
+            from socio.cuota
+            where id = @id_cuota;
+            
+            -- Copiar las inscripciones a actividades
+            insert into socio.inscripcion_actividad (id_cuota, id_actividad)
+            select @id_cuota_nueva, id_actividad
+            from socio.inscripcion_actividad
+            where id_cuota = @id_cuota;
+
+            -- Vamos a calcular el monto total de las actividades copiadas por si hubo aumento de precio
+            declare @monto_total_actividades decimal(8,2);
+            select @monto_total_actividades = isnull(sum(a.costo_mensual), 0)
+            from socio.inscripcion_actividad ia
+            inner join general.actividad a on ia.id_actividad = a.id
+            where ia.id_cuota = @id_cuota_nueva;
+
+            -- Con la fecha de nacimiento del socio, vamos a buscar la categoria la nueva por si cambia
+            declare @fecha_nacimiento date;
+            select @fecha_nacimiento = fecha_nacimiento
+            from socio.socio
+            where id = @id_socio;
+
+            declare @edad_nueva int;
+            set @edad_nueva = datediff(YEAR, @fecha_nacimiento, @fecha_actual);
+            if dateadd(year, @edad_nueva, @fecha_nacimiento) > cast(@fecha_actual as date)
+                set @edad_nueva = @edad_nueva - 1;
+
+            -- Buscamos la nueva categoria (por si cambia)
+            declare @id_categoria_nueva int;
+            declare @monto_categoria_nueva decimal(8,2);
+            select @id_categoria_nueva = id, @monto_categoria_nueva = costo_mensual
+            from socio.categoria
+            where edad_min <= @edad_nueva and edad_max >= @edad_nueva;
+
+            -- Actualizamos el monto total de la cuota (actividades + categoria)
+            set @monto_total = @monto_total_actividades + @monto_categoria_nueva;
+
+            -- Actualizamos el monto total de la cuota
+            update socio.cuota
+            set monto_total = @monto_total
+            where id = @id_cuota_nueva;
+
+            -- Actualizamos la categoria de la cuota
+            update socio.cuota
+            set id_categoria = @id_categoria_nueva
+            where id = @id_cuota_nueva;
+
+        commit transaction;
+    end try
+    begin catch
+        rollback transaction;
+        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
+        raiserror('Error al copiar la cuota: %s', 16, 1, @ErrorMessage);
+        return;
+    end catch
 end
 go
