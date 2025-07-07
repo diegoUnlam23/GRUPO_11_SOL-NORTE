@@ -18,6 +18,7 @@ RECONFIGURE;
 
 EXEC sp_configure 'Ad Hoc Distributed Queries', 1;
 RECONFIGURE;
+go
 
 
 CREATE OR ALTER PROCEDURE socio.importarSociosDesdeArchivo
@@ -147,7 +148,7 @@ BEGIN
             @id_tutor = NULL,
             @id_grupo_familiar = NULL,
             @responsable_pago = 1,
-            @estado = N'al dia';
+            @estado = 'Activo';
         
         -- Pasar a la siguiente fila
         SET @current_row = @current_row + 1;

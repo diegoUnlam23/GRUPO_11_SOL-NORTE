@@ -18,6 +18,7 @@ RECONFIGURE;
 
 EXEC sp_configure 'Ad Hoc Distributed Queries', 1;
 RECONFIGURE;
+go
 
 CREATE OR ALTER PROCEDURE socio.importarPresentismoDesdeArchivo
     @arch VARCHAR(200)

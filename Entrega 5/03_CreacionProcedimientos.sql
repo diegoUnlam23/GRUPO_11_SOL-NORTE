@@ -563,9 +563,16 @@ begin
         return;
     end
 
-    if exists (select 1 from socio.registro_pileta where id_socio = @id_socio and fecha = @fecha)
+    -- Validar que no exista ya un registro para el mismo socio o invitado en la misma fecha
+    if @id_socio is not null and exists (select 1 from socio.registro_pileta where id_socio = @id_socio and fecha = @fecha)
     begin
         raiserror('Ya existe un registro para ese socio y fecha.', 16, 1);
+        return;
+    end
+
+    if @id_invitado is not null and exists (select 1 from socio.registro_pileta where id_invitado = @id_invitado and fecha = @fecha)
+    begin
+        raiserror('Ya existe un registro para ese invitado y fecha.', 16, 1);
         return;
     end
 
@@ -599,9 +606,19 @@ create or alter procedure general.altaActividadExtra
 as
 begin
     SET NOCOUNT ON;
+    declare @id_actividad_extra int;
+
+    -- Validar que existe el socio
     if not exists (select 1 from socio.socio where id = @id_socio)
     begin
         raiserror('No existe un socio con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Validar que el costo sea mayor a 0
+    if @costo <= 0
+    begin
+        raiserror('El costo debe ser mayor a 0.', 16, 1);
         return;
     end
 
@@ -611,7 +628,7 @@ begin
         insert into general.actividad_extra (id_socio, nombre, costo)
         values (@id_socio, @nombre, @costo);
 
-        declare @id_actividad_extra int = scope_identity();
+        set @id_actividad_extra = scope_identity();
 
         exec socio.altaFacturaExtra
             @id_actividad_extra = @id_actividad_extra;
@@ -644,16 +661,32 @@ begin
     -- Generar valores automáticamente
     declare @numero_comprobante int;
     declare @tipo_comprobante varchar(2) = 'B';
-    declare @fecha_emision date = getdate();
-    declare @periodo_facturado int = year(@fecha_emision) * 100 + month(@fecha_emision);
+    declare @fecha_emision date;
+    declare @periodo_facturado int;
     declare @iva varchar(50) = '21%';
-    declare @fecha_vencimiento_1 date = dateadd(day, 30, @fecha_emision);
-    declare @fecha_vencimiento_2 date = dateadd(day, 40, @fecha_emision);
+    declare @fecha_vencimiento_1 date;
+    declare @fecha_vencimiento_2 date;
     declare @descripcion varchar(100);
     declare @importe_total decimal(8,2);
 
     -- Generar número de comprobante automáticamente
     select @numero_comprobante = isnull(max(numero_comprobante), 0) + 1 from socio.factura_extra;
+
+    -- Obtener fecha de emisión según el tipo de factura
+    if @id_registro_pileta is not null
+    begin
+        -- Para facturas de pileta, usar la fecha del registro
+        select @fecha_emision = fecha from socio.registro_pileta where id = @id_registro_pileta;
+    end
+    else if @id_actividad_extra is not null
+    begin
+        -- Para facturas de actividad extra, usar la fecha actual
+        set @fecha_emision = getdate();
+    end
+
+    set @periodo_facturado = year(@fecha_emision) * 100 + month(@fecha_emision);
+    set @fecha_vencimiento_1 = dateadd(day, 30, @fecha_emision);
+    set @fecha_vencimiento_2 = dateadd(day, 40, @fecha_emision);
 
     declare @id_tarifa int;
     declare @precio_tarifa decimal(8,2);
@@ -901,11 +934,11 @@ begin
     if dateadd(year, @edad_socio, @fecha_nacimiento_socio) > cast(@fecha_actual as date)
         set @edad_socio = @edad_socio - 1;
 
-    -- Buscamos la categoria del socio
+    -- Con la edad del socio, buscamos la categoria
     declare @id_categoria_socio int;
-    select @id_categoria_socio = id_categoria
-    from socio.socio
-    where id = @id_socio;
+    select @id_categoria_socio = id
+    from socio.categoria
+    where edad_min <= @edad_socio and edad_max >= @edad_socio;
 
     -- Buscamos la categoria de la clase
     declare @id_categoria_clase int;
@@ -1733,8 +1766,6 @@ begin
         end
     end
 
-    print 'monto: ' + cast(@monto as varchar(15));
-
     update socio.estado_cuenta
     set saldo = saldo + @monto
     where id = @id_estado_cuenta;
@@ -2031,8 +2062,17 @@ begin
         );
         set @id_pago = scope_identity();
 
-        -- Llamamos al procedimiento para generar la cuota del próximo mes copiando las mismas actividades, monto, etc
-        exec socio.copiarCuota @id_cuota = @id_cuota, @mes = @mes_actual, @anio = @anio_actual;
+        if @tipo_factura = 'CUOTA'
+        begin
+            -- Llamamos al procedimiento para generar la cuota del próximo mes copiando las mismas actividades, monto, etc
+            exec socio.copiarCuota @id_cuota = @id_cuota;
+        end
+        else
+        begin
+            -- Para facturas extra: NO generar movimientos de cuenta ni afectar estado de cuenta
+            -- Son pagos inmediatos que se registran pero no alteran el saldo
+            print 'Pago de factura extra procesado - No se afecta el estado de cuenta (pago inmediato)';
+        end
 
         -- Actualizar saldo según el tipo de usuario
         if @es_invitado = 1
@@ -2596,6 +2636,8 @@ create or alter procedure general.altaActividad
     @costo_mensual decimal(8,2)
 as
 begin
+    set nocount on;
+
     if @costo_mensual <= 0
     begin
         raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
@@ -2682,6 +2724,8 @@ create or alter procedure socio.altaCategoria
     @edad_max int
 as
 begin
+    set nocount on;
+    
     if @costo_mensual <= 0
     begin
         raiserror('El costo mensual debe ser mayor a 0.', 16, 1);
@@ -2774,6 +2818,7 @@ begin
     set costo_mensual = @costo_mensual
     where id = @id;
 end
+go
 
 -- Delete
 create or alter procedure socio.bajaCategoria
@@ -2971,12 +3016,6 @@ begin
     if @fecha_procesamiento is null
         set @fecha_procesamiento = getdate();
 
-    /*if @fecha_procesamiento > getdate()
-    begin
-        raiserror('No se puede procesar débitos automáticos para una fecha futura.', 16, 1);
-        return;
-    end*/
-
     declare @cantidad_procesados int = 0;
     declare @total_procesado decimal(10,2) = 0;
     declare @cantidad_exitosos int = 0;
@@ -2995,16 +3034,57 @@ begin
         inner join socio.socio s on s.id = da.id_responsable_pago and s.responsable_pago = 1
         inner join socio.cuota c on c.id_socio = s.id
         where da.activo = 1
+        and c.id = (
+            select top 1 c2.id
+            from socio.cuota c2
+            where c2.id_socio = s.id
+            order by c2.anio desc, c2.mes desc
+        )
 
         union all
 
-        -- Tutores responsables de pago
-        select da.id_responsable_pago, c.id, c.monto_total, 1, da.medio_de_pago
+        -- Tutores responsables de pago (solo la cuota más reciente)
+        /*select da.id_responsable_pago, c.id, c.monto_total, 1, da.medio_de_pago
         from socio.debito_automatico da
         inner join socio.tutor t on t.id = da.id_responsable_pago
         inner join socio.socio s on s.id_tutor = t.id
         inner join socio.cuota c on c.id_socio = s.id
-        where da.activo = 1;
+        where da.activo = 1
+        and c.id = (
+            select top 1 c2.id
+            from socio.cuota c2
+            where c2.id_socio = s.id
+            order by c2.anio desc, c2.mes desc
+        )
+
+        union all*/
+
+        -- Socios menores a cargo del responsable de pago
+        select da.id_responsable_pago, c.id, c.monto_total, 1, da.medio_de_pago from socio.debito_automatico da
+        inner join socio.socio s on da.id_responsable_pago = s.id_grupo_familiar
+        inner join socio.cuota c on c.id_socio = s.id
+        where da.activo = 1
+        and c.id = (
+            select top 1 c2.id
+            from socio.cuota c2
+            where c2.id_socio = s.id
+            order by c2.anio desc, c2.mes desc
+        )
+
+        union all
+
+        -- Socios menores a cargo de un tutor
+        select da.id_responsable_pago, c.id, c.monto_total, 1, da.medio_de_pago from socio.debito_automatico da
+        inner join socio.socio s on da.id_responsable_pago = s.id_tutor
+        inner join socio.cuota c on c.id_socio = s.id
+        where da.activo = 1
+        and c.id = (
+            select top 1 c2.id
+            from socio.cuota c2
+            where c2.id_socio = s.id
+            order by c2.anio desc, c2.mes desc
+        )
+
 
         -- Variables para iterar
         declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(8,2), @es_tutor bit, @medio_de_pago varchar(50);
@@ -3063,6 +3143,7 @@ as
 begin
     set nocount on;
     -- Limpiar datos existentes en orden inverso a las dependencias
+    delete from socio.nota_credito;
     delete from socio.movimiento_cuenta;
     delete from socio.reembolso;
     delete from socio.pago;
@@ -3090,33 +3171,32 @@ begin
     delete from socio.tipo_reembolso;
 
     -- Resetear identity columns
-    dbcc checkident ('socio.movimiento_cuenta', reseed, 0);
-    dbcc checkident ('socio.reembolso', reseed, 0);
-    dbcc checkident ('socio.pago', reseed, 0);
-    dbcc checkident ('socio.item_factura_extra', reseed, 0);
-    dbcc checkident ('socio.item_factura_cuota', reseed, 0);
-    dbcc checkident ('socio.factura_extra', reseed, 0);
-    dbcc checkident ('socio.factura_cuota', reseed, 0);
-    dbcc checkident ('socio.estado_cuenta', reseed, 0);
-    dbcc checkident ('general.presentismo', reseed, 0);
-    dbcc checkident ('general.clase', reseed, 0);
-    dbcc checkident ('socio.inscripcion_actividad', reseed, 0);
-    dbcc checkident ('socio.registro_pileta', reseed, 0);
-    dbcc checkident ('socio.cuota', reseed, 0);
-    dbcc checkident ('socio.inscripcion', reseed, 0);
-    dbcc checkident ('socio.debito_automatico', reseed, 0);
-    dbcc checkident ('socio.socio', reseed, 0);
-    dbcc checkident ('socio.tutor', reseed, 0);
-    dbcc checkident ('socio.obra_social_socio', reseed, 0);
-    dbcc checkident ('socio.invitado', reseed, 0);
-    dbcc checkident ('socio.tarifa_pileta', reseed, 0);
-    dbcc checkident ('socio.categoria', reseed, 0);
-    dbcc checkident ('general.actividad_extra', reseed, 0);
-    dbcc checkident ('general.actividad', reseed, 0);
-    dbcc checkident ('general.empleado', reseed, 0);
-    dbcc checkident ('socio.tipo_reembolso', reseed, 0);
-
-    print 'Limpieza completada exitosamente';
+    dbcc checkident ('socio.nota_credito', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.movimiento_cuenta', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.reembolso', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.pago', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.item_factura_extra', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.item_factura_cuota', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.factura_extra', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.factura_cuota', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.estado_cuenta', reseed, 0) with no_infomsgs;
+    dbcc checkident ('general.presentismo', reseed, 0) with no_infomsgs;
+    dbcc checkident ('general.clase', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.inscripcion_actividad', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.registro_pileta', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.cuota', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.inscripcion', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.debito_automatico', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.socio', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.tutor', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.obra_social_socio', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.invitado', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.tarifa_pileta', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.categoria', reseed, 0) with no_infomsgs;
+    dbcc checkident ('general.actividad_extra', reseed, 0) with no_infomsgs;
+    dbcc checkident ('general.actividad', reseed, 0) with no_infomsgs;
+    dbcc checkident ('general.empleado', reseed, 0) with no_infomsgs;
+    dbcc checkident ('socio.tipo_reembolso', reseed, 0) with no_infomsgs;
 end
 GO
 
@@ -3353,10 +3433,21 @@ as
 begin
     SET NOCOUNT ON;
 
+    declare @id_socio int;
+    declare @id_categoria int;
+    declare @mes int;
+    declare @anio int;
     declare @mes_siguiente int;
     declare @anio_siguiente int;
+    declare @monto_total decimal(8,2);
 
-    select @mes = mes, @anio = anio
+    declare @fecha_actual date = getdate();
+
+    select @id_socio = id_socio,
+           @id_categoria = id_categoria,
+           @mes = mes,
+           @anio = anio,
+           @monto_total = monto_total
     from socio.cuota
     where id = @id_cuota;
 
@@ -3377,21 +3468,6 @@ begin
         raiserror('No existe una cuota con ese ID.', 16, 1);
         return;
     end
-
-    -- Obtener información de la cuota
-    declare @id_socio int;
-    declare @id_categoria int;
-    declare @mes int;
-    declare @anio int;
-    declare @monto_total decimal(8,2);
-
-    select @id_socio = id_socio,
-           @id_categoria = id_categoria,
-           @mes = mes,
-           @anio = anio,
-           @monto_total = monto_total
-    from socio.cuota
-    where id = @id_cuota;
 
     -- Verificar que la cuota anterior esté pagada
     if not exists (
@@ -3414,11 +3490,15 @@ begin
     begin try
         begin transaction;
 
+            declare @id_cuota_nueva int;
+
             -- Copiar la cuota
             insert into socio.cuota (id_socio, id_categoria, mes, anio, monto_total)
             select @id_socio, @id_categoria, @mes_siguiente, @anio_siguiente, @monto_total
             from socio.cuota
             where id = @id_cuota;
+
+            set @id_cuota_nueva = scope_identity();
             
             -- Copiar las inscripciones a actividades
             insert into socio.inscripcion_actividad (id_cuota, id_actividad)
@@ -3470,6 +3550,145 @@ begin
         rollback transaction;
         declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
         raiserror('Error al copiar la cuota: %s', 16, 1, @ErrorMessage);
+        return;
+    end catch
+end
+go
+
+
+-- Procedimiento para generar una Nota de Crédito
+create or alter procedure socio.generarNotaCredito
+    @id_factura_origen int,
+    @motivo_anulacion varchar(100)
+as
+begin
+    SET NOCOUNT ON;
+    
+    -- Validar que la factura existe
+    if not exists (select 1 from socio.factura_cuota where id = @id_factura_origen)
+    begin
+        raiserror('No existe una factura con ese ID.', 16, 1);
+        return;
+    end
+    
+    -- Validar que la factura no tenga ya una nota de crédito
+    if exists (select 1 from socio.nota_credito where id_factura_origen = @id_factura_origen)
+    begin
+        raiserror('La factura ya tiene una nota de crédito asociada.', 16, 1);
+        return;
+    end
+    
+    -- Obtener información de la factura
+    declare @id_cuota int;
+    declare @id_socio int;
+    declare @importe_total decimal(8,2);
+    declare @numero_comprobante int;
+    declare @fecha_emision date;
+    declare @id_tutor int;
+    declare @id_grupo_familiar int;
+    declare @responsable_pago bit;
+    declare @id_responsable_pago int;
+    
+    select @id_cuota = fc.id_cuota,
+           @importe_total = fc.importe_total,
+           @numero_comprobante = fc.numero_comprobante,
+           @fecha_emision = fc.fecha_emision
+    from socio.factura_cuota fc
+    where fc.id = @id_factura_origen;
+    
+    -- Obtener el socio de la cuota
+    select @id_socio = c.id_socio
+    from socio.cuota c
+    where c.id = @id_cuota;
+
+    -- Buscamos el tutor y el grupo familiar del socio
+    select @id_tutor = s.id_tutor, @id_grupo_familiar = s.id_grupo_familiar, @responsable_pago = s.responsable_pago
+    from socio.socio s
+    where s.id = @id_socio;
+
+    -- Si no es responsable de pago, vemos si es tutor o socio
+    if @responsable_pago = 0
+    begin
+        if @id_tutor is null
+            set @id_responsable_pago = @id_grupo_familiar;
+        else
+            set @id_responsable_pago = @id_tutor;
+    end
+    else
+        set @id_responsable_pago = @id_socio;
+
+    -- Verificar si la factura fue pagada
+    declare @factura_pagada bit = 0;
+    if exists (select 1 from socio.pago where id_factura_cuota = @id_factura_origen)
+    begin
+        set @factura_pagada = 1;
+    end
+    
+    -- Obtener próximo número de nota de crédito
+    declare @numero_nota_credito int;
+    select @numero_nota_credito = isnull(max(numero_nota_credito), 0) + 1
+    from socio.nota_credito;
+    
+    begin try
+        begin transaction;
+            
+            -- Insertar la nota de crédito
+            insert into socio.nota_credito (
+                numero_nota_credito,
+                fecha_anulacion,
+                id_factura_origen,
+                motivo_anulacion
+            )
+            values (
+                @numero_nota_credito,
+                @fecha_emision,
+                @id_factura_origen,
+                @motivo_anulacion
+            );
+            
+            -- Si la factura NO fue pagada, generar movimiento compensatorio en cuenta
+            if @factura_pagada = 0
+            begin
+                -- Obtener el estado de cuenta del socio
+                declare @id_estado_cuenta int;
+                select @id_estado_cuenta = id
+                from socio.estado_cuenta
+                where id_socio = @id_responsable_pago;
+                
+                -- Insertar movimiento positivo en cuenta (compensa el negativo de la factura)
+                insert into socio.movimiento_cuenta (
+                    id_estado_cuenta,
+                    fecha,
+                    monto,
+                    id_factura
+                )
+                values (
+                    @id_estado_cuenta,
+                    getdate(),
+                    @importe_total, -- Monto positivo
+                    @id_factura_origen
+                );
+                
+                -- Actualizar estado de cuenta del socio
+                update socio.estado_cuenta
+                set saldo = saldo + @importe_total
+                where id = @id_estado_cuenta;
+            end
+            
+        commit transaction;
+        
+        print 'Nota de Crédito generada exitosamente.';
+        print 'Número de Nota de Crédito: ' + cast(@numero_nota_credito as varchar);
+        if @factura_pagada = 0
+            print 'Se generó movimiento compensatorio en cuenta corriente.';
+        else
+            print 'No se generó movimiento en cuenta (factura ya pagada).';
+            
+    end try
+    begin catch
+        rollback transaction;
+        declare @ErrorMessage nvarchar(4000) = ERROR_MESSAGE();
+        raiserror('Error al generar la Nota de Crédito: %s', 16, 1, @ErrorMessage);
         return;
     end catch
 end

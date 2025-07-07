@@ -378,23 +378,22 @@ print 'Probando funcionalidades específicas del grupo familiar...';
 print '2.6.1 USO DE PILETA POR MENORES';
 print 'Registrando uso de pileta por los menores de la familia...';
 
--- Registro de pileta para Tomás
+-- Registro de pileta para Tomás que no genera factura extra
 exec socio.altaRegistroPileta @id_socio = @id_hijo1, @id_invitado = null, @fecha = '2024-01-20', @id_tarifa = 1;
 declare @id_registro_tomas int;
 select @id_registro_tomas = max(id) from socio.registro_pileta where id_socio = @id_hijo1 and fecha = '2024-01-20';
 
--- Registro de pileta para Sofía
+-- Registro de pileta para Sofía que ya genera factura extra
 exec socio.altaRegistroPileta @id_socio = @id_hija, @id_invitado = null, @fecha = '2024-01-20', @id_tarifa = 1;
 declare @id_registro_sofia int;
 select @id_registro_sofia = max(id) from socio.registro_pileta where id_socio = @id_hija and fecha = '2024-01-20';
 
--- Generar facturas extra por uso de pileta
-exec socio.altaFacturaExtra @id_registro_pileta = @id_registro_tomas;
-exec socio.altaFacturaExtra @id_registro_pileta = @id_registro_sofia;
-
 declare @id_factura_tomas int, @id_factura_sofia int;
 select @id_factura_tomas = max(id) from socio.factura_extra where id_registro_pileta = @id_registro_tomas;
 select @id_factura_sofia = max(id) from socio.factura_extra where id_registro_pileta = @id_registro_sofia;
+
+print 'id factura tomas: ' + cast(@id_factura_tomas as varchar(10));
+print 'id factura sofia: ' + cast(@id_factura_sofia as varchar(10));
 
 -- Verificar facturas extra generadas
 select 
@@ -472,103 +471,17 @@ print 'Débito automático configurado para el responsable de la familia';
 print '';
 
 -- =====================================================
--- 2.7 VERIFICACIÓN FINAL DEL CASO
+-- 2.6.4 PROCESAMIENTO DE DÉBITO AUTOMÁTICO FAMILIAR
 -- =====================================================
 
-print '2.7 VERIFICACIÓN FINAL DEL CASO';
-print 'Realizando verificación completa del caso familiar...';
+print '2.6.4 PROCESAMIENTO DE DÉBITO AUTOMÁTICO FAMILIAR';
+print 'Simulando procesamiento automático de débitos para el grupo familiar...';
 
--- Resumen del grupo familiar
+-- Mostrar estado de cuenta ANTES del procesamiento automático
+print '';
+print '--- ESTADO DE CUENTA ANTES DEL PROCESAMIENTO AUTOMÁTICO ---';
 select 
-    'RESUMEN DEL GRUPO FAMILIAR' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    s.dni as DNI,
-    s.fecha_nacimiento as Fecha_Nacimiento,
-    c.nombre as Categoria,
-    cu.monto_total as Monto_Cuota,
-    case s.responsable_pago when 1 then 'Sí' else 'No' end as Responsable_Pago,
-    s.nro_socio as Nro_Socio,
-    sm.nro_socio as Nro_Socio_Menor
-from socio.socio s
-inner join socio.cuota cu on s.id = cu.id_socio
-inner join socio.categoria c on cu.id_categoria = c.id
-where s.id in (@id_padre, @id_hijo1, @id_hija)
-order by s.fecha_nacimiento;
-
--- Resumen de actividades por miembro
-select 
-    'ACTIVIDADES POR MIEMBRO' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual
-from socio.inscripcion_actividad ia
-inner join socio.cuota c on ia.id_cuota = c.id
-inner join socio.socio s on c.id_socio = s.id
-inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
-order by s.fecha_nacimiento, a.nombre;
-
--- Resumen de facturas generadas
-select 
-    'FACTURAS GENERADAS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    'Cuota' as Tipo,
-    numero_comprobante as Numero,
-    fecha_emision as Fecha,
-    importe_total as Importe
-from socio.factura_cuota fc
-inner join socio.cuota c on fc.id_cuota = c.id
-inner join socio.socio s on c.id_socio = s.id
-where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
-union all
-select 
-    'FACTURAS GENERADAS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    'Extra - Pileta' as Tipo,
-    numero_comprobante as Numero,
-    fecha_emision as Fecha,
-    importe_total as Importe
-from socio.factura_extra fe
-inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
-inner join socio.socio s on rp.id_socio = s.id
-where rp.id_socio in (@id_hijo1, @id_hija)
-order by Socio, Tipo, Fecha;
-
--- Resumen de pagos realizados
-select 
-    'PAGOS REALIZADOS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    p.monto as Monto,
-    p.medio_de_pago as Medio_de_Pago,
-    p.fecha_pago as Fecha_Pago,
-    case 
-        when p.id_factura_cuota is not null then 'Factura Cuota'
-        when p.id_factura_extra is not null then 'Factura Extra'
-        else 'Otro'
-    end as Tipo_Factura
-from socio.pago p
-inner join socio.factura_cuota fc on p.id_factura_cuota = fc.id
-inner join socio.cuota c on fc.id_cuota = c.id
-inner join socio.socio s on c.id_socio = s.id
-where c.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
-union all
-select 
-    'PAGOS REALIZADOS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    p.monto as Monto,
-    p.medio_de_pago as Medio_de_Pago,
-    p.fecha_pago as Fecha_Pago,
-    'Factura Extra' as Tipo_Factura
-from socio.pago p
-inner join socio.factura_extra fe on p.id_factura_extra = fe.id
-inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
-inner join socio.socio s on rp.id_socio = s.id
-where rp.id_socio in (@id_hijo1, @id_hija)
-order by Socio, Fecha_Pago;
-
--- Estado de cuenta final de todos los miembros
-select 
-    'ESTADO DE CUENTA FINAL' as Seccion,
+    'Estado de cuenta ANTES del procesamiento automático' as Estado,
     s.nombre + ' ' + s.apellido as Socio,
     ec.saldo as Saldo_Actual,
     case 
@@ -581,17 +494,415 @@ inner join socio.socio s on ec.id_socio = s.id
 where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
 order by s.fecha_nacimiento;
 
--- Verificación de descuentos aplicados
+-- Mostrar facturas de cuota ANTES de procesar débitos automáticos
+print '';
+print '--- FACTURAS DE CUOTA ANTES DEL DÉBITO AUTOMÁTICO ---';
 select 
-    'VERIFICACIÓN DE DESCUENTOS' as Seccion,
+    'Facturas existentes' as Estado,
     s.nombre + ' ' + s.apellido as Socio,
-    'Cuota base' as Concepto,
-    cu.monto_total as Monto_Base,
-    fc.importe_total as Monto_Final,
-    cu.monto_total - fc.importe_total as Descuento_Aplicado,
-    round(((cu.monto_total - fc.importe_total) / cu.monto_total * 100), 2) as Porcentaje_Descuento
+    fc.id as ID_Factura,
+    fc.numero_comprobante as Numero,
+    fc.fecha_emision as Fecha,
+    fc.periodo_facturado as Periodo,
+    fc.importe_total as Importe,
+    fc.descripcion as Descripcion
 from socio.factura_cuota fc
-inner join socio.cuota cu on fc.id_cuota = cu.id
-inner join socio.socio s on cu.id_socio = s.id
-where cu.id in (@id_cuota_padre, @id_cuota_hijo, @id_cuota_hija)
+inner join socio.cuota c on fc.id_cuota = c.id
+inner join socio.socio s on c.id_socio = s.id
+where c.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento, fc.fecha_emision;
+
+-- Procesar débitos automáticos para el grupo familiar
+print '';
+print 'Procesando débitos automáticos para la fecha 2025-08-15';
+exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-08-15';
+
+-- Mostrar facturas de cuota DESPUÉS del procesamiento
+print '';
+print '--- FACTURAS DE CUOTA DESPUÉS DEL DÉBITO AUTOMÁTICO ---';
+select 
+    'Facturas después del débito automático' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    fc.id as ID_Factura,
+    fc.numero_comprobante as Numero,
+    fc.fecha_emision as Fecha,
+    fc.periodo_facturado as Periodo,
+    fc.importe_total as Importe,
+    fc.descripcion as Descripcion
+from socio.factura_cuota fc
+inner join socio.cuota c on fc.id_cuota = c.id
+inner join socio.socio s on c.id_socio = s.id
+where c.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento, fc.fecha_emision;
+
+-- Mostrar estado de cuenta DESPUÉS del procesamiento automático
+print '';
+print '--- ESTADO DE CUENTA DESPUÉS DEL PROCESAMIENTO AUTOMÁTICO ---';
+select 
+    'Estado de cuenta DESPUÉS del procesamiento automático' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo,
+    'Débito automático procesado exitosamente' as Observacion
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
 order by s.fecha_nacimiento;
+
+-- Verificar pagos generados automáticamente
+select 
+    'Pagos automáticos procesados' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    p.monto as Monto_Pagado,
+    p.medio_de_pago as Medio_de_Pago,
+    p.fecha_pago as Fecha_Pago,
+    'Procesado automáticamente por débito automático' as Tipo
+from socio.pago p
+inner join socio.factura_cuota fc on p.id_factura_cuota = fc.id
+inner join socio.cuota c on fc.id_cuota = c.id
+inner join socio.socio s on c.id_socio = s.id
+where c.id_socio in (@id_padre, @id_hijo1, @id_hija)
+and cast(p.fecha_pago as date) = cast(getdate() as date)
+order by s.fecha_nacimiento;
+
+print 'Débito automático procesado exitosamente para el grupo familiar';
+print 'IMPORTANTE: El sistema genera facturas y procesa pagos automáticamente para socios con débito automático activo';
+print '';
+
+-- =====================================================
+-- 2.7 NUEVAS FUNCIONALIDADES DEL 03.1
+-- =====================================================
+
+print '2.7 NUEVAS FUNCIONALIDADES DEL 03.1';
+print 'Probando funcionalidades adicionales para el grupo familiar...';
+
+-- =====================================================
+-- 2.7.1 SISTEMA DE REINTEGRO POR LLUVIA
+-- =====================================================
+
+print '2.7.1 SISTEMA DE REINTEGRO POR LLUVIA';
+print 'Probando sistema de reintegro por lluvia para el grupo familiar...';
+
+-- Registrar uso de pileta en día de lluvia para los menores que crea las facturas automaticamente
+exec socio.altaRegistroPileta @id_socio = @id_hijo1, @id_invitado = null, @fecha = '2024-01-25', @id_tarifa = 1;
+exec socio.altaRegistroPileta @id_socio = @id_hija, @id_invitado = null, @fecha = '2024-01-25', @id_tarifa = 1;
+
+declare @id_registro_tomas_lluvia int, @id_registro_sofia_lluvia int;
+select @id_registro_tomas_lluvia = max(id) from socio.registro_pileta where id_socio = @id_hijo1 and fecha = '2024-01-25';
+select @id_registro_sofia_lluvia = max(id) from socio.registro_pileta where id_socio = @id_hija and fecha = '2024-01-25';
+
+declare @id_factura_tomas_lluvia int, @id_factura_sofia_lluvia int;
+select @id_factura_tomas_lluvia = max(id) from socio.factura_extra where id_registro_pileta = @id_registro_tomas_lluvia;
+select @id_factura_sofia_lluvia = max(id) from socio.factura_extra where id_registro_pileta = @id_registro_sofia_lluvia;
+
+-- Procesar pagos de las facturas extra
+declare @monto_factura_tomas_lluvia decimal(8,2), @monto_factura_sofia_lluvia decimal(8,2);
+select @monto_factura_tomas_lluvia = importe_total from socio.factura_extra where id = @id_factura_tomas_lluvia;
+select @monto_factura_sofia_lluvia = importe_total from socio.factura_extra where id = @id_factura_sofia_lluvia;
+
+exec socio.altaPago @monto = @monto_factura_tomas_lluvia, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_tomas_lluvia;
+exec socio.altaPago @monto = @monto_factura_sofia_lluvia, @medio_de_pago = 'Visa', @id_factura_extra = @id_factura_sofia_lluvia;
+
+-- Mostrar estado de cuenta ANTES del reintegro por lluvia
+print '';
+print '--- ESTADO DE CUENTA ANTES DEL REINTEGRO POR LLUVIA ---';
+select 
+    'Estado de cuenta ANTES del reintegro por lluvia' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento;
+
+-- Procesar reintegro por lluvia (60% del valor)
+print '';
+print 'Procesando reintegro por lluvia del 60% para el 25/01/2024...';
+exec socio.procesarReintegroLluvia @fecha_lluvia = '2024-01-25', @porcentaje_reintegro = 60.00;
+
+-- Mostrar estado de cuenta DESPUÉS del reintegro por lluvia
+print '';
+print '--- ESTADO DE CUENTA DESPUÉS DEL REINTEGRO POR LLUVIA ---';
+select 
+    'Estado de cuenta DESPUÉS del reintegro por lluvia' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo,
+    'Reintegro del 60% aplicado automáticamente' as Observacion
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento;
+
+-- Verificar reembolsos generados
+print '';
+print '--- REEMBOLSOS POR LLUVIA GENERADOS ---';
+select 
+    'Reembolsos por lluvia' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    r.fecha_reembolso as Fecha_Reembolso,
+    r.motivo as Motivo,
+    r.monto as Monto_Reembolsado,
+    tr.descripcion as Tipo_Reembolso
+from socio.reembolso r
+inner join socio.tipo_reembolso tr on r.id_tipo_reembolso = tr.id
+inner join socio.pago p on r.id_pago = p.id
+inner join socio.factura_extra fe on p.id_factura_extra = fe.id
+inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
+inner join socio.socio s on rp.id_socio = s.id
+where rp.fecha = '2024-01-25'
+and r.motivo = 'Reintegro por lluvia'
+order by s.fecha_nacimiento;
+
+print 'Reintegro por lluvia procesado exitosamente para el grupo familiar';
+print '';
+
+-- =====================================================
+-- 2.7.2 ACTIVIDADES EXTRA PARA EL GRUPO FAMILIAR
+-- =====================================================
+
+print '2.7.2 ACTIVIDADES EXTRA PARA EL GRUPO FAMILIAR';
+print 'Registrando actividades extra para los miembros de la familia...';
+
+-- Actividad extra para Tomás: Alquiler de cancha de fútbol
+exec general.altaActividadExtra @id_socio = @id_hijo1, @nombre = 'Alquiler cancha fútbol', @costo = 50000.00;
+declare @id_actividad_extra_tomas int;
+select @id_actividad_extra_tomas = max(id) from general.actividad_extra where id_socio = @id_hijo1;
+
+-- Actividad extra para Sofía: Clase particular de baile
+exec general.altaActividadExtra @id_socio = @id_hija, @nombre = 'Clase particular baile', @costo = 35000.00;
+declare @id_actividad_extra_sofia int;
+select @id_actividad_extra_sofia = max(id) from general.actividad_extra where id_socio = @id_hija;
+
+-- Verificar facturas extra generadas automáticamente
+select 
+    'Facturas extra por actividades' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ae.nombre as Actividad_Extra,
+    ae.costo as Costo,
+    fe.numero_comprobante as Numero_Factura,
+    fe.fecha_emision as Fecha_Emision,
+    fe.importe_total as Importe_Total
+from socio.factura_extra fe
+inner join general.actividad_extra ae on fe.id_actividad_extra = ae.id
+inner join socio.socio s on ae.id_socio = s.id
+where ae.id in (@id_actividad_extra_tomas, @id_actividad_extra_sofia)
+order by s.fecha_nacimiento;
+
+-- Procesar pagos de actividades extra
+declare @id_factura_actividad_tomas int, @id_factura_actividad_sofia int;
+declare @monto_actividad_tomas decimal(8,2), @monto_actividad_sofia decimal(8,2);
+
+select @id_factura_actividad_tomas = fe.id, @monto_actividad_tomas = fe.importe_total
+from socio.factura_extra fe
+inner join general.actividad_extra ae on fe.id_actividad_extra = ae.id
+where ae.id = @id_actividad_extra_tomas;
+
+select @id_factura_actividad_sofia = fe.id, @monto_actividad_sofia = fe.importe_total
+from socio.factura_extra fe
+inner join general.actividad_extra ae on fe.id_actividad_extra = ae.id
+where ae.id = @id_actividad_extra_sofia;
+
+exec socio.altaPago @monto = @monto_actividad_tomas, @medio_de_pago = 'MasterCard', @id_factura_extra = @id_factura_actividad_tomas;
+exec socio.altaPago @monto = @monto_actividad_sofia, @medio_de_pago = 'MasterCard', @id_factura_extra = @id_factura_actividad_sofia;
+
+print 'Actividades extra registradas y pagadas exitosamente';
+print '';
+
+-- =====================================================
+-- 2.7.3 INVITADOS A PILETA POR EL GRUPO FAMILIAR
+-- =====================================================
+
+print '2.7.3 INVITADOS A PILETA POR EL GRUPO FAMILIAR';
+print 'Registrando invitados a pileta por los miembros de la familia...';
+
+-- Invitado de Tomás: su amigo Carlos
+exec socio.altaInvitado @nombre = 'Carlos', @apellido = 'González', @dni = 11111111, @email = 'carlos.gonzalez@email.com', @saldo_a_favor = 0.00;
+
+-- Invitado de Sofía: su prima Ana
+exec socio.altaInvitado @nombre = 'Ana', @apellido = 'López', @dni = 22222222, @email = 'ana.lopez@email.com', @saldo_a_favor = 0.00;
+
+declare @id_invitado_carlos int, @id_invitado_ana int;
+select @id_invitado_carlos = id from socio.invitado where dni = 11111111;
+select @id_invitado_ana = id from socio.invitado where dni = 22222222;
+
+-- Registrar invitados a pileta
+exec socio.altaRegistroPileta @id_socio = null, @id_invitado = @id_invitado_carlos, @fecha = '2024-01-28', @id_tarifa = 2;
+exec socio.altaRegistroPileta @id_socio = null, @id_invitado = @id_invitado_ana, @fecha = '2024-01-28', @id_tarifa = 2;
+
+-- Verificar facturas extra generadas para invitados
+select 
+    'Facturas extra para invitados' as Estado,
+    i.nombre + ' ' + i.apellido as Invitado,
+    'Invitado por ' + s.nombre + ' ' + s.apellido as Invitado_Por,
+    fe.numero_comprobante as Numero_Factura,
+    fe.fecha_emision as Fecha_Emision,
+    fe.importe_total as Importe_Total
+from socio.factura_extra fe
+inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
+inner join socio.invitado i on rp.id_invitado = i.id
+inner join socio.socio s on (
+    case 
+        when i.dni = 11111111 then @id_hijo1  -- Carlos es invitado de Tomás
+        when i.dni = 22222222 then @id_hija   -- Ana es invitada de Sofía
+    end
+) = s.id
+where rp.fecha = '2024-01-28'
+order by i.nombre;
+
+-- Procesar pagos de invitados
+declare @id_factura_invitado_carlos int, @id_factura_invitado_ana int;
+declare @monto_invitado_carlos decimal(8,2), @monto_invitado_ana decimal(8,2);
+
+select @id_factura_invitado_carlos = fe.id, @monto_invitado_carlos = fe.importe_total
+from socio.factura_extra fe
+inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
+where rp.id_invitado = @id_invitado_carlos and rp.fecha = '2024-01-28';
+
+select @id_factura_invitado_ana = fe.id, @monto_invitado_ana = fe.importe_total
+from socio.factura_extra fe
+inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
+where rp.id_invitado = @id_invitado_ana and rp.fecha = '2024-01-28';
+
+exec socio.altaPago @monto = @monto_invitado_carlos, @medio_de_pago = 'Pago Fácil', @id_factura_extra = @id_factura_invitado_carlos;
+exec socio.altaPago @monto = @monto_invitado_ana, @medio_de_pago = 'Rapipago', @id_factura_extra = @id_factura_invitado_ana;
+
+print 'Invitados registrados y facturas pagadas exitosamente';
+print '';
+
+-- =====================================================
+-- 2.7.4 REGISTRO DE PRESENTISMO PARA EL GRUPO FAMILIAR
+-- =====================================================
+
+print '2.7.4 REGISTRO DE PRESENTISMO PARA EL GRUPO FAMILIAR';
+print 'Registrando presentismo en clases para los miembros de la familia...';
+
+-- Crear clases para diferentes categorías
+exec general.altaClase @hora_inicio = '16:00', @hora_fin = '17:00', @dia = 'Martes', @id_categoria = 2, @id_actividad = 2, @id_empleado = 2; -- Vóley para Cadetes
+exec general.altaClase @hora_inicio = '15:00', @hora_fin = '16:00', @dia = 'Miércoles', @id_categoria = 1, @id_actividad = 4, @id_empleado = 3; -- Baile para Menores
+
+-- Registrar presentismo
+declare @id_clase_voley int, @id_clase_baile int;
+select @id_clase_voley = id from general.clase where id_actividad = 2 and id_categoria = 2;
+select @id_clase_baile = id from general.clase where id_actividad = 4 and id_categoria = 1;
+
+-- Tomás en clase de Vóley
+exec general.altaPresentismo @id_socio = @id_hijo1, @id_clase = @id_clase_voley, @fecha = '2024-01-23', @tipo_asistencia = 'A';
+
+-- Sofía en clase de Baile
+exec general.altaPresentismo @id_socio = @id_hija, @id_clase = @id_clase_baile, @fecha = '2024-01-24', @tipo_asistencia = 'A';
+
+-- Verificar presentismo registrado
+select 
+    'Presentismo registrado' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    a.nombre as Actividad,
+    c.nombre as Categoria,
+    CONVERT(varchar(5), cl.hora_inicio, 108) + ' - ' + CONVERT(varchar(5), cl.hora_fin, 108) as Horario,
+    cl.dia as Dia,
+    p.fecha as Fecha_Asistencia,
+    case p.tipo_asistencia 
+        when 'A' then 'Asistió'
+        when 'F' then 'Faltó'
+        when 'J' then 'Justificada'
+        else 'Otro'
+    end as Tipo_Asistencia
+from general.presentismo p
+inner join socio.socio s on p.id_socio = s.id
+inner join general.clase cl on p.id_clase = cl.id
+inner join general.actividad a on cl.id_actividad = a.id
+inner join socio.categoria c on cl.id_categoria = c.id
+where p.id_socio in (@id_hijo1, @id_hija)
+order by s.fecha_nacimiento, p.fecha;
+
+print 'Presentismo registrado exitosamente para los menores de la familia';
+print '';
+
+-- =====================================================
+-- 2.7.5 PRUEBAS DE NOTAS DE CRÉDITO PARA EL GRUPO FAMILIAR
+-- =====================================================
+
+print '2.7.5 PRUEBAS DE NOTAS DE CRÉDITO PARA EL GRUPO FAMILIAR';
+print 'Probando funcionalidad de notas de crédito para el grupo familiar...';
+
+-- Crear una cuota sin facturar para probar NC
+print '';
+print 'Creando una nueva cuota sin facturar para probar NC...';
+declare @id_cuota_sin_facturar_familiar int;
+exec socio.altaCuota @id_socio = @id_hijo1, @id_categoria = 2, @monto_total = 150.00, @mes = 11, @anio = 2025;
+select @id_cuota_sin_facturar_familiar = max(id) from socio.cuota where id_socio = @id_hijo1 and mes = 11 and anio = 2025;
+
+-- Generar factura para esta cuota
+declare @id_factura_sin_pagar_familiar int;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_sin_facturar_familiar, @fecha_emision = '2025-11-01';
+select @id_factura_sin_pagar_familiar = max(id) from socio.factura_cuota where id_cuota = @id_cuota_sin_facturar_familiar;
+
+print 'Factura #' + cast(@id_factura_sin_pagar_familiar as varchar) + ' creada para cuota sin pagar de Tomás';
+
+-- Mostrar estado de cuenta ANTES de la NC
+print '';
+print '--- ESTADO DE CUENTA ANTES DE LA NOTA DE CRÉDITO ---';
+select 
+    'Estado de cuenta ANTES de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento;
+
+-- Generar nota de crédito para la factura sin pagar
+print '';
+print 'Generando nota de crédito para factura #' + cast(@id_factura_sin_pagar_familiar as varchar) + '...';
+exec socio.generarNotaCredito @id_factura_origen = @id_factura_sin_pagar_familiar, @motivo_anulacion = 'ERROR_FACTURACION_FAMILIAR';
+
+-- Verificar nota de crédito creada
+declare @id_nota_credito_familiar int;
+select @id_nota_credito_familiar = max(id) from socio.nota_credito where id_factura_origen = @id_factura_sin_pagar_familiar;
+
+select 
+    'Nota de Crédito creada para factura sin pagar' as Estado,
+    numero_nota_credito as Numero_NC,
+    fecha_anulacion as Fecha_Anulacion,
+    motivo_anulacion as Motivo,
+    'Factura #' + cast(id_factura_origen as varchar) as Factura_Origen
+from socio.nota_credito
+where id = @id_nota_credito_familiar;
+
+-- Mostrar estado de cuenta DESPUÉS de la NC
+print '';
+print '--- ESTADO DE CUENTA DESPUÉS DE LA NOTA DE CRÉDITO ---';
+select 
+    'Estado de cuenta DESPUÉS de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
+order by s.fecha_nacimiento;
+
+print 'Nota de crédito generada exitosamente para el grupo familiar';
+print '';

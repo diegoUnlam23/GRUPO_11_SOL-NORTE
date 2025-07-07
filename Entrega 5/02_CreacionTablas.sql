@@ -237,6 +237,17 @@ create table socio.item_factura_cuota
 );
 go
 
+create table socio.nota_credito
+(
+	id					int primary key identity(1,1),
+	numero_nota_credito		int NOT NULL,
+	fecha_anulacion			date NOT NULL,
+	id_factura_origen		int NOT NULL,
+	motivo_anulacion		varchar(100) NOT NULL,
+	foreign key (id_factura_origen) references socio.factura_cuota(id)
+);
+go
+
 create table socio.factura_extra
 (
 	id						int primary key identity(1,1),

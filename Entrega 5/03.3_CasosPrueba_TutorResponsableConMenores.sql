@@ -164,8 +164,8 @@ select @id_socio_lucia = id from socio.socio where dni = 45678901;
 exec socio.altaCuota @id_socio = @id_socio_martin, @id_categoria = 1, @monto_total = 120.00, @mes = 7, @anio = 2025;
 select @id_cuota_martin = max(id) from socio.cuota where id_socio = @id_socio_martin;
 
--- Lucía: categoría Cadete (id_categoria = 2)
-exec socio.altaCuota @id_socio = @id_socio_lucia, @id_categoria = 2, @monto_total = 150.00, @mes = 7, @anio = 2025;
+-- Lucía: categoría Menor (id_categoria = 1) - tiene 12 años en 2024
+exec socio.altaCuota @id_socio = @id_socio_lucia, @id_categoria = 1, @monto_total = 150.00, @mes = 7, @anio = 2025;
 select @id_cuota_lucia = max(id) from socio.cuota where id_socio = @id_socio_lucia;
 
 -- Verificar creación de cuotas
@@ -520,20 +520,70 @@ print '';
 print '3.11 REGISTRO DE PRESENTISMO EN CLASE';
 print 'Registrando presentismo en clase para Martín y Lucía Fernández...';
 
+-- Verificar categorías de los socios antes de crear las clases
+print '';
+print '--- VERIFICACIÓN DE CATEGORÍAS DE LOS SOCIOS ---';
+select 
+    'Categoría del socio' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    s.fecha_nacimiento as Fecha_Nacimiento,
+    datediff(YEAR, s.fecha_nacimiento, getdate()) as Edad_Calculada,
+    c.nombre as Categoria,
+    c.edad_min as Edad_Min,
+    c.edad_max as Edad_Max
+from socio.socio s
+inner join socio.cuota cu on s.id = cu.id_socio
+inner join socio.categoria c on cu.id_categoria = c.id
+where s.id in (@id_socio_martin, @id_socio_lucia);
+
 -- Crear clase para registrar presentismo (Futsal, categoría Menor, empleado 1)
+print '';
+print 'Creando clase de Futsal para categoría Menor...';
 exec general.altaClase @hora_inicio = '17:00', @hora_fin = '18:00', @dia = 'Martes', @id_categoria = 1, @id_actividad = 1, @id_empleado = 1;
 declare @id_clase_futsal int;
 select @id_clase_futsal = id from general.clase where id_actividad = 1 and id_categoria = 1;
 
+-- Verificar clase creada
+select 
+    'Clase creada' as Estado,
+    a.nombre as Actividad,
+    c.nombre as Categoria,
+    cl.hora_inicio as Hora_Inicio,
+    cl.hora_fin as Hora_Fin,
+    cl.dia as Dia
+from general.clase cl
+inner join general.actividad a on cl.id_actividad = a.id
+inner join socio.categoria c on cl.id_categoria = c.id
+where cl.id = @id_clase_futsal;
+
 -- Presentismo Martín (Futsal)
+print '';
+print 'Registrando presentismo de Martín en clase de Futsal...';
 exec general.altaPresentismo @id_socio = @id_socio_martin, @id_clase = @id_clase_futsal, @fecha = '2024-02-13', @tipo_asistencia = 'A';
 
--- Crear clase para registrar presentismo (Baile artístico, categoría Cadete, empleado 2)
-exec general.altaClase @hora_inicio = '18:00', @hora_fin = '19:00', @dia = 'Miércoles', @id_categoria = 2, @id_actividad = 4, @id_empleado = 2;
+-- Crear clase para registrar presentismo (Baile artístico, categoría Menor, empleado 2)
+print '';
+print 'Creando clase de Baile artístico para categoría Menor...';
+exec general.altaClase @hora_inicio = '18:00', @hora_fin = '19:00', @dia = 'Miércoles', @id_categoria = 1, @id_actividad = 4, @id_empleado = 2;
 declare @id_clase_baile int;
-select @id_clase_baile = id from general.clase where id_actividad = 4 and id_categoria = 2;
+select @id_clase_baile = id from general.clase where id_actividad = 4 and id_categoria = 1;
+
+-- Verificar clase creada
+select 
+    'Clase creada' as Estado,
+    a.nombre as Actividad,
+    c.nombre as Categoria,
+    cl.hora_inicio as Hora_Inicio,
+    cl.hora_fin as Hora_Fin,
+    cl.dia as Dia
+from general.clase cl
+inner join general.actividad a on cl.id_actividad = a.id
+inner join socio.categoria c on cl.id_categoria = c.id
+where cl.id = @id_clase_baile;
 
 -- Presentismo Lucía (Baile artístico)
+print '';
+print 'Registrando presentismo de Lucía en clase de Baile artístico...';
 exec general.altaPresentismo @id_socio = @id_socio_lucia, @id_clase = @id_clase_baile, @fecha = '2024-02-14', @tipo_asistencia = 'A';
 
 -- Verificar presentismo registrado
@@ -831,10 +881,43 @@ print 'Invitado registrado y factura pagada inmediatamente';
 print ''; 
 
 -- =====================================================
--- 3.17 DÉBITO AUTOMÁTICO PARA TUTOR
+-- 3.17 CREACIÓN DE CUOTAS ADICIONALES PARA DÉBITO AUTOMÁTICO
 -- =====================================================
 
-print '3.17 DÉBITO AUTOMÁTICO PARA TUTOR';
+print '3.17 CREACIÓN DE CUOTAS ADICIONALES PARA DÉBITO AUTOMÁTICO';
+print 'Creando cuotas adicionales para septiembre de 2025 que serán procesadas por débito automático...';
+
+-- Crear cuotas adicionales para septiembre de 2025 (sin facturas previas)
+exec socio.altaCuota @id_socio = @id_socio_martin, @id_categoria = 1, @monto_total = 120.00, @mes = 9, @anio = 2025;
+exec socio.altaCuota @id_socio = @id_socio_lucia, @id_categoria = 1, @monto_total = 150.00, @mes = 9, @anio = 2025;
+
+-- Verificar cuotas adicionales creadas
+select 
+    'Cuotas adicionales creadas' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    c.nombre as Categoria,
+    cu.mes as Mes,
+    cu.anio as Anio,
+    cu.monto_total as Monto_Total,
+    case 
+        when fc.id is null then 'Sin facturar'
+        else 'Ya facturada'
+    end as Estado_Factura
+from socio.cuota cu
+inner join socio.socio s on cu.id_socio = s.id
+inner join socio.categoria c on cu.id_categoria = c.id
+left join socio.factura_cuota fc on cu.id = fc.id_cuota
+where cu.mes = 9 and cu.anio = 2025
+and s.id in (@id_socio_martin, @id_socio_lucia);
+
+print 'Cuotas adicionales creadas exitosamente para septiembre de 2025';
+print '';
+
+-- =====================================================
+-- 3.18 DÉBITO AUTOMÁTICO PARA TUTOR
+-- =====================================================
+
+print '3.18 DÉBITO AUTOMÁTICO PARA TUTOR';
 print 'Configurando débito automático para el tutor responsable...';
 
 -- Crear débito automático para el tutor
@@ -857,10 +940,10 @@ print 'Débito automático configurado exitosamente para el tutor';
 print '';
 
 -- =====================================================
--- 3.18 PROCESAMIENTO AUTOMÁTICO DE DÉBITOS
+-- 3.19 PROCESAMIENTO AUTOMÁTICO DE DÉBITOS
 -- =====================================================
 
-print '3.18 PROCESAMIENTO AUTOMÁTICO DE DÉBITOS';
+print '3.19 PROCESAMIENTO AUTOMÁTICO DE DÉBITOS';
 print 'Simulando procesamiento automático de débitos para el tutor...';
 
 -- Estado de cuenta ANTES del procesamiento automático
@@ -893,8 +976,8 @@ order by fc.fecha_emision;
 
 -- Procesar débitos automáticos
 print '';
-print 'Procesando débitos automáticos para la fecha 2025-07-15...';
-exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-07-15';
+print 'Procesando débitos automáticos para la fecha 2025-09-15...';
+exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-09-15';
 
 -- Mostrar facturas generadas automáticamente
 print '';
@@ -911,7 +994,7 @@ from socio.factura_cuota fc
 inner join socio.cuota c on fc.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 where s.id in (@id_socio_martin, @id_socio_lucia)
-and cast(fc.fecha_emision as date) = cast(getdate() as date)
+and fc.periodo_facturado = 202509
 order by fc.fecha_emision;
 
 -- Mostrar pagos procesados automáticamente
@@ -930,7 +1013,7 @@ inner join socio.factura_cuota fc on p.id_factura_cuota = fc.id
 inner join socio.cuota c on fc.id_cuota = c.id
 inner join socio.socio s on c.id_socio = s.id
 where s.id in (@id_socio_martin, @id_socio_lucia)
-and cast(p.fecha_pago as date) = cast(getdate() as date)
+and fc.periodo_facturado = 202509
 order by p.fecha_pago;
 
 -- Estado de cuenta DESPUÉS del procesamiento automático
@@ -974,10 +1057,10 @@ print 'IMPORTANTE: El sistema genera facturas y procesa pagos automáticamente p
 print '';
 
 -- =====================================================
--- 3.19 VERIFICACIÓN: MENORES NO TIENEN ESTADO DE CUENTA PROPIO
+-- 3.20 VERIFICACIÓN: MENORES NO TIENEN ESTADO DE CUENTA PROPIO
 -- =====================================================
 
-print '3.19 VERIFICACIÓN: MENORES NO TIENEN ESTADO DE CUENTA PROPIO';
+print '3.20 VERIFICACIÓN: MENORES NO TIENEN ESTADO DE CUENTA PROPIO';
 print 'Verificando que los menores NO tienen estado de cuenta propio...';
 
 -- Verificar que los menores NO tienen estado de cuenta
@@ -1016,157 +1099,3 @@ order by s.id_grupo_familiar, s.nombre;
 
 print 'Ambos menores pertenecen al mismo grupo familiar y comparten tutor';
 print '';
-
--- =====================================================
--- 3.21 RESUMEN DE ACTIVIDADES POR MENOR
--- =====================================================
-
-print '3.21 RESUMEN DE ACTIVIDADES POR MENOR';
-print 'Mostrando resumen de actividades deportivas de cada menor...';
-
-select 
-    'ACTIVIDADES POR MENOR' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    a.nombre as Actividad,
-    a.costo_mensual as Costo_Mensual
-from socio.inscripcion_actividad ia
-inner join socio.cuota c on ia.id_cuota = c.id
-inner join socio.socio s on c.id_socio = s.id
-inner join general.actividad a on ia.id_actividad = a.id
-where c.id in (@id_cuota_martin, @id_cuota_lucia)
-order by s.nombre, a.nombre;
-
-print 'Resumen de actividades deportivas completado';
-print '';
-
--- =====================================================
--- 3.22 VERIFICACIÓN DE INTEGRIDAD DE DATOS
--- =====================================================
-
-print '3.22 VERIFICACIÓN DE INTEGRIDAD DE DATOS';
-print 'Verificando integridad de datos del caso...';
-
--- Verificar que no hay inconsistencias
-select 
-    'VERIFICACIÓN DE INTEGRIDAD' as Seccion,
-    'Socios menores' as Tipo,
-    count(*) as Cantidad,
-    'Todos los menores tienen tutor asignado' as Verificacion
-from socio.socio s
-where s.id_tutor is not null and s.fecha_nacimiento < '2018-01-01'
-union all
-select 
-    'VERIFICACIÓN DE INTEGRIDAD' as Seccion,
-    'Estado de cuenta tutor' as Tipo,
-    count(*) as Cantidad,
-    'El tutor tiene estado de cuenta creado' as Verificacion
-from socio.estado_cuenta ec
-inner join socio.tutor t on ec.id_tutor = t.id
-where t.dni = 23456789
-union all
-select 
-    'VERIFICACIÓN DE INTEGRIDAD' as Seccion,
-    'Facturas generadas' as Tipo,
-    count(*) as Cantidad,
-    'Todas las facturas están pagadas' as Verificacion
-from socio.factura_cuota fc
-inner join socio.cuota c on fc.id_cuota = c.id
-inner join socio.socio s on c.id_socio = s.id
-where s.id in (@id_socio_martin, @id_socio_lucia);
-
-print 'Verificación de integridad completada';
-print '';
-
--- =====================================================
--- 3.23 VERIFICACIÓN FINAL DEL CASO
--- =====================================================
-
-print '3.23 VERIFICACIÓN FINAL DEL CASO';
-print 'Realizando verificación completa del caso...';
-
--- Resumen de los menores
-select 
-    'RESUMEN DE SOCIOS MENORES' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    s.dni as DNI,
-    s.email as Email,
-    s.estado as Estado,
-    c.nombre as Categoria,
-    cu.monto_total as Monto_Cuota,
-    s.nro_socio as Nro_Socio
-from socio.socio s
-inner join socio.cuota cu on s.id = cu.id_socio
-inner join socio.categoria c on cu.id_categoria = c.id
-where s.id in (@id_socio_martin, @id_socio_lucia);
-
--- Resumen de facturas
-select 
-    'FACTURAS GENERADAS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    'Cuota' as Tipo,
-    fc.numero_comprobante as Numero,
-    fc.fecha_emision as Fecha,
-    fc.importe_total as Importe,
-    'Cuota mensual del menor' as Descripcion
-from socio.factura_cuota fc
-inner join socio.cuota cu on fc.id_cuota = cu.id
-inner join socio.socio s on cu.id_socio = s.id
-where cu.id in (@id_cuota_martin, @id_cuota_lucia)
-union all
-select 
-    'FACTURAS GENERADAS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    'Extra - Pileta' as Tipo,
-    fe.numero_comprobante as Numero,
-    fe.fecha_emision as Fecha,
-    fe.importe_total as Importe,
-    'Uso de pileta' as Descripcion
-from socio.factura_extra fe
-inner join socio.registro_pileta rp on fe.id_registro_pileta = rp.id
-inner join socio.socio s on rp.id_socio = s.id
-where s.id in (@id_socio_martin, @id_socio_lucia)
-union all
-select 
-    'FACTURAS GENERADAS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    'Extra - Actividad' as Tipo,
-    fe.numero_comprobante as Numero,
-    fe.fecha_emision as Fecha,
-    fe.importe_total as Importe,
-    'Alquiler del SUM para cumpleaños' as Descripcion
-from socio.factura_extra fe
-inner join general.actividad_extra ae on fe.id_actividad_extra = ae.id
-inner join socio.socio s on ae.id_socio = s.id
-where s.id = @id_socio_lucia;
-
--- Resumen de pagos
-select 
-    'PAGOS REALIZADOS' as Seccion,
-    s.nombre + ' ' + s.apellido as Socio,
-    p.monto as Monto,
-    p.medio_de_pago as Medio_de_Pago,
-    p.fecha_pago as Fecha_Pago,
-    case 
-        when p.id_factura_cuota is not null then 'Factura Cuota'
-        when p.id_factura_extra is not null then 'Factura Extra'
-        else 'Otro'
-    end as Tipo_Factura
-from socio.pago p
-inner join socio.socio s on (p.id_factura_cuota in (select id from socio.factura_cuota where id_cuota in (@id_cuota_martin, @id_cuota_lucia))
-    or p.id_factura_extra in (select id from socio.factura_extra where id_registro_pileta in (select id from socio.registro_pileta where id_socio in (@id_socio_martin, @id_socio_lucia))
-    or id_actividad_extra in (select id from general.actividad_extra where id_socio = @id_socio_lucia)))
-order by p.fecha_pago;
-
--- Estado de cuenta final del tutor
-select 
-    'ESTADO DE CUENTA FINAL' as Seccion,
-    t.nombre + ' ' + t.apellido as Tutor,
-    ec.saldo as Saldo_Actual,
-    case 
-        when ec.saldo > 0 then 'Saldo a favor'
-        when ec.saldo < 0 then 'Deuda'
-        else 'Saldo cero'
-    end as Estado_Saldo
-from socio.estado_cuenta ec
-inner join socio.tutor t on ec.id_tutor = t.id
-where t.dni = 23456789;

@@ -133,7 +133,7 @@ print 'Creando cuota para el socio...';
 declare @id_socio_pedro int, @id_cuota_pedro int;
 select @id_socio_pedro = id from socio.socio where dni = 12345678;
 
-exec socio.altaCuota @id_socio = @id_socio_pedro, @id_categoria = 3, @monto_total = 200.00, @mes = 7, @anio = 2025;
+exec socio.altaCuota @id_socio = @id_socio_pedro, @id_categoria = 2, @monto_total = 200.00, @mes = 7, @anio = 2025;
 select @id_cuota_pedro = max(id) from socio.cuota where id_socio = @id_socio_pedro;
 
 -- Verificar creación de la cuota
@@ -709,8 +709,8 @@ order by fc.fecha_emision;
 
 -- Procesar débitos automáticos (primera vez)
 print '';
-print 'Procesando débitos automáticos para la fecha 2025-07-15';
-exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-07-15';
+print 'Procesando débitos automáticos para la fecha 2025-08-15';
+exec socio.procesarDebitosAutomaticos @fecha_procesamiento = '2025-08-15';
 
 -- Mostrar facturas de cuota DESPUÉS del primer procesamiento
 print '';
@@ -1148,7 +1148,208 @@ print 'Invitado registrado y factura pagada inmediatamente';
 print '';
 
 -- =====================================================
--- 1.18 VERIFICACIÓN FINAL DEL CASO
+-- 1.18 PRUEBAS DE NOTAS DE CRÉDITO
+-- =====================================================
+
+print '1.18 PRUEBAS DE NOTAS DE CRÉDITO';
+print 'Probando funcionalidad de notas de crédito para anulación de facturas...';
+print '';
+
+-- =====================================================
+-- 1.18.1 NOTA DE CRÉDITO PARA FACTURA NO PAGADA
+-- =====================================================
+
+print '1.18.1 NOTA DE CRÉDITO PARA FACTURA NO PAGADA';
+print 'Escenario: Generar NC para factura de cuota (que no fue pagada)...';
+
+-- Crear una nueva cuota sin facturar para probar NC
+print '';
+print 'Creando una nueva cuota sin facturar para probar NC...';
+declare @id_cuota_sin_facturar int;
+exec socio.altaCuota @id_socio = @id_socio_pedro, @id_categoria = 3, @monto_total = 150.00, @mes = 10, @anio = 2025;
+select @id_cuota_sin_facturar = max(id) from socio.cuota where id_socio = @id_socio_pedro and mes = 10 and anio = 2025;
+
+-- Generar factura para esta cuota
+declare @id_factura_sin_pagar int;
+exec socio.altaFacturaCuota @id_cuota = @id_cuota_sin_facturar, @fecha_emision = '2025-10-01';
+select @id_factura_sin_pagar = max(id) from socio.factura_cuota where id_cuota = @id_cuota_sin_facturar;
+
+print 'Factura #' + cast(@id_factura_sin_pagar as varchar) + ' creada para cuota sin pagar';
+
+-- Mostrar estado de cuenta ANTES de la NC
+print '';
+print '--- ESTADO DE CUENTA ANTES DE LA NOTA DE CRÉDITO ---';
+select 
+    'Estado de cuenta ANTES de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio = @id_socio_pedro;
+
+-- Generar nota de crédito para la factura sin pagar
+print '';
+print 'Generando nota de crédito para factura #' + cast(@id_factura_sin_pagar as varchar) + '...';
+exec socio.generarNotaCredito @id_factura_origen = @id_factura_sin_pagar, @motivo_anulacion = 'ERROR_FACTURACION';
+
+-- Verificar nota de crédito creada
+declare @id_nota_credito_1 int;
+select @id_nota_credito_1 = max(id) from socio.nota_credito where id_factura_origen = @id_factura_sin_pagar;
+
+select 
+    'Nota de Crédito creada' as Estado,
+    numero_nota_credito as Numero_NC,
+    fecha_anulacion as Fecha_Anulacion,
+    motivo_anulacion as Motivo,
+    'Factura #' + cast(id_factura_origen as varchar) as Factura_Origen
+from socio.nota_credito
+where id = @id_nota_credito_1;
+
+-- Mostrar estado de cuenta DESPUÉS de la NC
+print '';
+print '--- ESTADO DE CUENTA DESPUÉS DE LA NOTA DE CRÉDITO ---';
+select 
+    'Estado de cuenta DESPUÉS de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio = @id_socio_pedro;
+
+-- Verificar movimiento compensatorio generado
+print '';
+print '--- MOVIMIENTO COMPENSATORIO GENERADO ---';
+select 
+    'Movimiento compensatorio' as Estado,
+    mc.fecha as Fecha,
+    mc.monto as Monto,
+    case 
+        when mc.monto > 0 then 'CRÉDITO'
+        when mc.monto < 0 then 'DÉBITO'
+        else 'NEUTRO'
+    end as Tipo_Movimiento,
+    'Nota de Crédito - Anulación Factura' as Concepto
+from socio.movimiento_cuenta mc
+inner join socio.estado_cuenta ec on mc.id_estado_cuenta = ec.id
+where ec.id_socio = @id_socio_pedro and mc.id_factura = @id_factura_sin_pagar
+order by mc.fecha desc;
+
+print 'Nota de crédito generada exitosamente para factura no pagada';
+print 'Se generó movimiento compensatorio en cuenta corriente';
+print '';
+
+-- =====================================================
+-- 1.18.2 NOTA DE CRÉDITO PARA FACTURA YA PAGADA
+-- =====================================================
+
+print '1.18.2 NOTA DE CRÉDITO PARA FACTURA YA PAGADA';
+print 'Escenario: Generar NC para factura de cuota (que ya fue pagada)...';
+
+-- Mostrar estado de cuenta ANTES de la NC
+print '';
+print '--- ESTADO DE CUENTA ANTES DE LA NC (FACTURA PAGADA) ---';
+select 
+    'Estado de cuenta ANTES de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio = @id_socio_pedro;
+
+-- Generar nota de crédito para la factura de cuota (ya pagada)
+print '';
+print 'Generando nota de crédito para factura de cuota #' + cast(@id_factura_cuota_pedro as varchar) + ' (YA PAGADA)...';
+exec socio.generarNotaCredito @id_factura_origen = @id_factura_cuota_pedro, @motivo_anulacion = 'ERROR_FACTURACION';
+
+-- Verificar nota de crédito creada
+declare @id_nota_credito_2 int;
+select @id_nota_credito_2 = max(id) from socio.nota_credito where id_factura_origen = @id_factura_cuota_pedro;
+
+select 
+    'Nota de Crédito creada' as Estado,
+    numero_nota_credito as Numero_NC,
+    fecha_anulacion as Fecha_Anulacion,
+    motivo_anulacion as Motivo,
+    'Factura #' + cast(id_factura_origen as varchar) as Factura_Origen
+from socio.nota_credito
+where id = @id_nota_credito_2;
+
+-- Mostrar estado de cuenta DESPUÉS de la NC
+print '';
+print '--- ESTADO DE CUENTA DESPUÉS DE LA NC (FACTURA PAGADA) ---';
+select 
+    'Estado de cuenta DESPUÉS de la NC' as Estado,
+    s.nombre + ' ' + s.apellido as Socio,
+    ec.saldo as Saldo_Actual,
+    case 
+        when ec.saldo > 0 then 'Saldo a favor'
+        when ec.saldo < 0 then 'Deuda'
+        else 'Saldo cero'
+    end as Estado_Saldo
+from socio.estado_cuenta ec
+inner join socio.socio s on ec.id_socio = s.id
+where ec.id_socio = @id_socio_pedro;
+
+-- Verificar que NO se generó movimiento compensatorio
+print '';
+print '--- VERIFICACIÓN: NO DEBE HABER MOVIMIENTO COMPENSATORIO ---';
+select 
+    'Movimientos recientes' as Estado,
+    mc.fecha as Fecha,
+    mc.monto as Monto,
+    case 
+        when mc.monto > 0 then 'CRÉDITO'
+        when mc.monto < 0 then 'DÉBITO'
+        else 'NEUTRO'
+    end as Tipo_Movimiento,
+    case 
+        when mc.id_factura = @id_factura_cuota_pedro then 'Factura Cuota'
+        when mc.id_factura = @id_factura_sin_pagar then 'Factura Cuota Sin Pagar'
+        else 'Otro'
+    end as Concepto
+from socio.movimiento_cuenta mc
+inner join socio.estado_cuenta ec on mc.id_estado_cuenta = ec.id
+where ec.id_socio = @id_socio_pedro
+order by mc.fecha desc;
+
+print 'Nota de crédito generada exitosamente para factura ya pagada';
+print 'NO se generó movimiento compensatorio (correcto)';
+print '';
+
+-- =====================================================
+-- 1.18.3 INTENTO DE DUPLICAR NOTA DE CRÉDITO
+-- =====================================================
+
+print '1.18.3 INTENTO DE DUPLICAR NOTA DE CRÉDITO';
+print 'Probando validación: No debe permitir crear NC duplicada...';
+
+begin try
+    exec socio.generarNotaCredito @id_factura_origen = @id_factura_cuota_pedro, @motivo_anulacion = 'ERROR_FACTURACION';
+    print 'ERROR: Se permitió crear NC duplicada';
+end try
+begin catch
+    print 'VALIDACIÓN EXITOSA: ' + ERROR_MESSAGE();
+end catch
+
+print '';
+
+-- =====================================================
+-- 1.19 VERIFICACIÓN FINAL DEL CASO
 -- =====================================================
 
 print '1.18 VERIFICACIÓN FINAL DEL CASO';
@@ -1248,6 +1449,23 @@ where id_factura_cuota = @id_factura_cuota_pedro
        where ae.id_socio = @id_socio_pedro
    )
 order by fecha_pago;
+
+-- Resumen de notas de crédito
+select 
+    'NOTAS DE CRÉDITO' as Seccion,
+    numero_nota_credito as Numero_NC,
+    fecha_anulacion as Fecha_Anulacion,
+    motivo_anulacion as Motivo,
+    case 
+        when exists (select 1 from socio.pago where id_factura_cuota = nc.id_factura_origen) then 'Factura Pagada'
+        else 'Factura No Pagada'
+    end as Estado_Factura_Original
+from socio.nota_credito nc
+where nc.id_factura_origen in (
+    select fc.id from socio.factura_cuota fc 
+    where fc.id_cuota in (@id_cuota_pedro, @id_cuota_sin_facturar)
+)
+order by fecha_anulacion;
 
 -- Estado de cuenta final
 select 
