@@ -3483,7 +3483,7 @@ begin
     -- Verificar que no exista ya una cuota para el mes siguiente
     if exists (select 1 from socio.cuota where id_socio = @id_socio and mes = @mes_siguiente and anio = @anio_siguiente)
     begin
-        raiserror('Ya existe una cuota para el mes siguiente.', 16, 1);
+        -- raiserror('Ya existe una cuota para el mes siguiente.', 16, 1); MC
         return;
     end
 
@@ -3691,5 +3691,38 @@ begin
         raiserror('Error al generar la Nota de Crédito: %s', 16, 1, @ErrorMessage);
         return;
     end catch
+end
+go
+
+create or alter procedure socio.generarFacturasMasivas
+    @mes int,
+    @anio int
+as
+begin
+    SET NOCOUNT ON;
+
+    -- Buscamos las cuotas correspondientes a ese mes y año
+    declare @cuotas table (id int, id_socio int);
+    insert into @cuotas (id, id_socio)
+    select id, id_socio
+    from socio.cuota
+    where mes = @mes and anio = @anio;
+
+    -- Transformo el mes y año a fecha
+    declare @fecha_emision date = datefromparts(@anio, @mes, 1);
+    
+    -- Iteramos sobre las cuotas y llamamos a altaFacturaCuota
+    declare @id_cuota int;
+    declare @id_socio int;
+
+    while exists (select 1 from @cuotas)
+    begin
+        select top 1 @id_cuota = id, @id_socio = id_socio
+        from @cuotas;
+
+        exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
+
+        delete from @cuotas where id = @id_cuota;
+    end
 end
 go

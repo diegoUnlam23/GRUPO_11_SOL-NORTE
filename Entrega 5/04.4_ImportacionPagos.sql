@@ -171,6 +171,10 @@ BEGIN
             SET @id_factura = SCOPE_IDENTITY();
         END
 
+        -- Tomamos "Efectivo" como "Rapipago" ya que el sistema no acepta "Efectivo"
+        IF @medio_pago = 'Efectivo'
+            SET @medio_pago = 'Rapipago';
+
         -- Insertar el item de la factura
         INSERT INTO socio.item_factura_cuota (
             id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total

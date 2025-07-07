@@ -26,11 +26,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    /*PRINT '=== INICIANDO IMPORTACIÓN DE PRESENTISMO ===';
-    PRINT 'Archivo a procesar: ' + @arch;
-    PRINT 'Filtrando registros para socio SN-4129';
-    PRINT '';*/
-
     IF OBJECT_ID('tempdb..##presentismo') IS NOT NULL
         DROP TABLE ##presentismo;
 
@@ -74,31 +69,6 @@ BEGIN
 
 	EXEC sp_executesql @script;
 
-    /*PRINT '=== REGISTROS DEL SOCIO SN-4129 EN ARCHIVO ORIGINAL ===';
-    SELECT 
-        nro_socio, 
-        actividad, 
-        fecha_asistencia, 
-        asistencia, 
-        profesor,
-        'Original' as estado
-    FROM ##presentismo 
-    WHERE nro_socio = 'SN-4129';
-    PRINT '';
-
-    -- Mostrar fechas originales del socio SN-4129
-    PRINT '=== FECHAS ORIGINALES DEL SOCIO SN-4129 ===';
-    SELECT 
-        fecha_asistencia as fecha_original,
-        TRY_PARSE(fecha_asistencia AS date USING 'es-AR') as fecha_parseada,
-        CASE 
-            WHEN TRY_PARSE(fecha_asistencia AS date USING 'es-AR') IS NULL THEN 'ERROR - No se pudo parsear'
-            ELSE 'OK - Fecha válida'
-        END as estado_parsing
-    FROM ##presentismo 
-    WHERE nro_socio = 'SN-4129';
-    PRINT '';*/
-
     -- Eliminar filas con datos incompletos y aplicar TRIM
     DELETE FROM ##presentismo
     WHERE nro_socio IS NULL OR LTRIM(RTRIM(nro_socio)) = ''
@@ -106,18 +76,6 @@ BEGIN
        OR fecha_asistencia IS NULL OR LTRIM(RTRIM(fecha_asistencia)) = ''
        OR asistencia IS NULL OR LTRIM(RTRIM(asistencia)) = ''
        OR profesor IS NULL OR LTRIM(RTRIM(profesor)) = '';
-
-    /*PRINT '=== REGISTROS DEL SOCIO SN-4129 DESPUÉS DE LIMPIEZA ===';
-    SELECT 
-        nro_socio, 
-        actividad, 
-        fecha_asistencia, 
-        asistencia, 
-        profesor,
-        'Después limpieza' as estado
-    FROM ##presentismo 
-    WHERE nro_socio = 'SN-4129';
-    PRINT '';*/
 
 	-- Preparar datos limpios para procesar
     INSERT INTO #procesar (nro_socio, actividad, fecha_asistencia, asistencia, profesor)
@@ -129,22 +87,9 @@ BEGIN
         LTRIM(RTRIM(p.profesor))
     FROM ##presentismo p;
 
-    /*PRINT '=== CONVERSIÓN DE FECHAS PARA SN-4129 ===';
-    SELECT 
-        p.nro_socio, 
-        p.fecha_asistencia as fecha_original, 
-        CONVERT(datetime, p.fecha_asistencia, 103) as fecha_parseada
-    FROM ##presentismo p
-    WHERE p.nro_socio = 'SN-4129';
-    PRINT '';*/
-
 	-- Procesar registros
     SELECT @max_row = MAX(RowNum) FROM #procesar;
 	
-	/*PRINT '=== PROCESANDO REGISTROS ===';
-	PRINT 'Total de registros a procesar: ' + CAST(@max_row AS VARCHAR(10));
-	PRINT '';*/
-
 	WHILE @current_row <= @max_row
 	BEGIN
 		DECLARE @nro_socio VARCHAR(20), @actividad VARCHAR(100), @fecha_asistencia DATE, @asistencia VARCHAR(5), @profesor VARCHAR(100),
@@ -159,18 +104,6 @@ BEGIN
 			@profesor = profesor
 		FROM #procesar
 		WHERE RowNum = @current_row;
-
-		-- Mostrar información detallada solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT '=== PROCESANDO REGISTRO DEL SOCIO SN-4129 ===';
-			PRINT 'RowNum: ' + CAST(@current_row AS VARCHAR(10));
-			PRINT 'Socio: ' + @nro_socio;
-			PRINT 'Actividad: ' + @actividad;
-			PRINT 'Fecha: ' + CAST(@fecha_asistencia AS VARCHAR(20));
-			PRINT 'Asistencia: ' + @asistencia;
-			PRINT 'Profesor: ' + @profesor;
-		END*/
 
 		-- Insertar profesor en general.empleado si no existe
 		IF NOT EXISTS (SELECT 1 FROM general.empleado WHERE nombre = @profesor)
@@ -187,24 +120,9 @@ BEGIN
 		-- Buscar id del socio y su fecha de nacimiento
 		SELECT @id_socio = id, @fecha_nac = fecha_nacimiento FROM socio.socio WHERE nro_socio = @nro_socio;
 
-		-- Mostrar información del socio solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT 'ID Socio: ' + CAST(@id_socio AS VARCHAR(10));
-			PRINT 'Fecha nacimiento: ' + CAST(@fecha_nac AS VARCHAR(20));
-			PRINT 'ID Actividad: ' + CAST(@id_actividad AS VARCHAR(10));
-			PRINT 'ID Empleado: ' + CAST(@id_empleado AS VARCHAR(10));
-		END*/
-
 		-- Calcular la edad del socio en la fecha de asistencia
 		SET @edad = DATEDIFF(year, @fecha_nac, @fecha_asistencia)
 			   - CASE WHEN DATEADD(year, DATEDIFF(year, @fecha_nac, @fecha_asistencia), @fecha_nac) > @fecha_asistencia THEN 1 ELSE 0 END;
-
-		-- Mostrar información de edad solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT 'Edad calculada: ' + CAST(@edad AS VARCHAR(10));
-		END*/
 
 		-- Buscar la categoría correspondiente
 		SELECT @id_categoria = id FROM socio.categoria WHERE @edad BETWEEN edad_min AND edad_max;
@@ -222,13 +140,6 @@ BEGIN
 				WHEN 7 THEN 'Domingo'
 			END;
 
-		-- Mostrar información de categoría y día solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT 'Categoría ID: ' + CAST(@id_categoria AS VARCHAR(10));
-			PRINT 'Día semana: ' + @dia_semana;
-		END*/
-
 		-- Buscar si ya existe la clase
 		SET @id_clase = NULL;
 		SELECT @id_clase = id FROM general.clase
@@ -236,22 +147,6 @@ BEGIN
 		  AND id_empleado = @id_empleado
 		  AND dia = @dia_semana
 		  AND id_categoria = @id_categoria;
-
-		/*
-		PRINT 'ID Clase: ' + CAST(@id_clase AS VARCHAR(10));
-		PRINT 'ID Actividad: ' + CAST(@id_actividad AS VARCHAR(10));
-		PRINT 'ID Empleado: ' + CAST(@id_empleado AS VARCHAR(10));
-		PRINT 'Día: ' + @dia_semana;
-		PRINT 'ID Categoría: ' + CAST(@id_categoria AS VARCHAR(10));
-		PRINT 'Registro de #procesar:';
-		PRINT 'Nro Socio: ' + @nro_socio;
-		PRINT 'Actividad: ' + @actividad;
-		PRINT 'Fecha Asistencia: ' + CAST(@fecha_asistencia AS VARCHAR(20));
-		PRINT 'Asistencia: ' + @asistencia;
-		PRINT 'Profesor: ' + @profesor;
-		PRINT '----------------------------------------';
-		PRINT '';
-		*/
 
 		-- Si la clase no existe, crearla
 		IF @id_clase IS NULL
@@ -267,49 +162,12 @@ BEGIN
 			  AND dia = @dia_semana
 			  AND id_categoria = @id_categoria;
 
-		-- Mostrar información de clase solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT 'ID Clase: ' + CAST(@id_clase AS VARCHAR(10));
-		END*/
-
 		-- Insertar presentismo
 		INSERT INTO general.presentismo(id_socio, id_clase, fecha, tipo_asistencia)
 		VALUES(@id_socio, @id_clase, @fecha_asistencia, @asistencia);
 
-		-- Mostrar confirmación de inserción solo para SN-4129
-		/*IF @nro_socio = 'SN-4129'
-		BEGIN
-			PRINT 'Presentismo insertado correctamente';
-			PRINT '----------------------------------------';
-			PRINT '';
-		END*/
-
 		SET @current_row = @current_row + 1;
 	END
-	
-	/*PRINT '=== IMPORTACIÓN COMPLETADA ===';
-	PRINT 'Total de registros procesados: ' + CAST((@max_row) AS VARCHAR(10));
-	PRINT '';*/
-
-	-- Mostrar registros finales del socio SN-4129 en presentismo
-	/*PRINT '=== REGISTROS FINALES DEL SOCIO SN-4129 EN PRESENTISMO ===';
-	SELECT 
-		p.id_socio,
-		s.nro_socio,
-		c.dia,
-		p.fecha,
-		p.tipo_asistencia,
-		a.nombre as actividad,
-		e.nombre as profesor
-	FROM general.presentismo p
-	JOIN socio.socio s ON p.id_socio = s.id
-	JOIN general.clase c ON p.id_clase = c.id
-	JOIN general.actividad a ON c.id_actividad = a.id
-	JOIN general.empleado e ON c.id_empleado = e.id
-	WHERE s.nro_socio = 'SN-4129'
-	ORDER BY p.fecha;
-	PRINT '';*/
 
 	-- Eliminar tablas temporales
 	DROP TABLE ##presentismo;
@@ -402,6 +260,27 @@ begin
 		exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
 
 		update #cuotas_mes set procesado = 1 where id_cuota = @id_cuota;
+
+		/*-- En caso de que pidan hacer de cuenta que fueron pagas, generamos los pagos.
+		-- Obtenemos el monto de la cuota
+		declare @monto_cuota decimal(8,2);
+		select @monto_cuota = monto_total from socio.cuota where id = @id_cuota;
+
+		-- Obtenemos el id de la factura de la cuota
+		declare @id_factura_cuota int;
+		select @id_factura_cuota = id from socio.factura_cuota where id_cuota = @id_cuota;
+
+		-- Generamos el pago
+		exec socio.altaPago
+			@monto = @monto_cuota,
+			@medio_de_pago = 'Visa',
+			@es_debito_automatico = 0,
+			@id_factura_cuota = @id_factura_cuota;*/
 	end
+
+	-- Eliminar tablas temporales
+	drop table #actividades_mes;
+	drop table #cuotas_a_crear;
+	drop table #cuotas_mes;
 end
 GO 

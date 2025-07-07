@@ -1,6 +1,6 @@
 /*
     Archivo de Pruebas Detalladas - Caso 1: Socio mayor de edad responsable de pago
-    Fecha de entrega: 01/07/2025
+    Fecha de entrega: 08/07/2025
     Número de comisión: 2900
     Número de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas
