@@ -3693,3 +3693,48 @@ begin
     end catch
 end
 go
+
+-- Procedimiento para generar todas las facturas de cuota de un mes y año dados
+create or alter procedure socio.generarFacturasCuotaMes
+    @anio int,
+    @mes int
+as
+begin
+    set nocount on;
+
+    -- Tabla temporal para cuotas sin factura
+    create table #cuotas_sin_factura (
+        id_cuota int primary key
+    );
+
+    insert into #cuotas_sin_factura (id_cuota)
+    select c.id
+    from socio.cuota c
+    left join socio.factura_cuota fc on fc.id_cuota = c.id
+    where c.anio = @anio
+      and c.mes = @mes
+      and fc.id is null;
+
+    declare @id_cuota int;
+    declare @cantidad_generadas int = 0;
+    -- Generamos la fecha de emision de la factura con el mes y año dados
+    declare @fecha_emision date = datefromparts(@anio, @mes, 1);
+
+    while exists (select 1 from #cuotas_sin_factura)
+    begin
+        select top 1 @id_cuota = id_cuota from #cuotas_sin_factura;
+        begin try
+            exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
+            set @cantidad_generadas = @cantidad_generadas + 1;
+        end try
+        begin catch
+            print 'Error al generar factura para cuota ID: ' + cast(@id_cuota as varchar) + ' - ' + ERROR_MESSAGE();
+        end catch
+        delete from #cuotas_sin_factura where id_cuota = @id_cuota;
+    end
+
+    drop table #cuotas_sin_factura;
+
+    print 'Facturas generadas: ' + cast(@cantidad_generadas as varchar);
+end
+GO
