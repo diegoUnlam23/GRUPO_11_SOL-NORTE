@@ -24,7 +24,7 @@ grant execute on socio.actualizarEstadoSocio to admin_morosidad;
 --ADMINISTRADOR COBRANZA
 grant execute on socio.altaPago to admin_cobranza;
 grant execute on socio.altaReembolso to admin_cobranza;
-grant execute on socio.ModificacionReembolso to admin_cobranza;
+grant execute on socio.altaDebitoAutomatico to admin_cobranza;
 grant execute on socio.procesarReintegroLluvia to admin_cobranza;
 grant control on socio.pago to admin_cobranza;
 grant control on socio.reembolso to admin_cobranza;
