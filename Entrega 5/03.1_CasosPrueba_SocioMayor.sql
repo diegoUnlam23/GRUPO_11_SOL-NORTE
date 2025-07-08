@@ -235,7 +235,7 @@ print '';
 print '1.5 PROCESAMIENTO DE PAGO';
 print 'Procesando pago de la factura cuota...';
 
-declare @monto_factura_cuota_pedro decimal(8,2);
+declare @monto_factura_cuota_pedro decimal(12,2);
 select @monto_factura_cuota_pedro = importe_total from socio.factura_cuota where id = @id_factura_cuota_pedro;
 
 -- Mostrar estado de cuenta ANTES del pago
@@ -407,7 +407,7 @@ print '';
 print '1.8 PAGO DE FACTURA EXTRA';
 print 'Procesando pago de la factura extra...';
 
-declare @monto_factura_extra_pileta decimal(8,2);
+declare @monto_factura_extra_pileta decimal(12,2);
 select @monto_factura_extra_pileta = importe_total from socio.factura_extra where id = @id_factura_extra_pileta;
 
 -- Mostrar estado de cuenta ANTES del pago de factura extra
@@ -560,7 +560,7 @@ print '';
 print '1.11 PAGO DE FACTURA EXTRA (ACTIVIDAD EXTRA)';
 print 'Procesando pago de la factura extra por actividad...';
 
-declare @monto_factura_extra_actividad decimal(8,2);
+declare @monto_factura_extra_actividad decimal(12,2);
 select @monto_factura_extra_actividad = importe_total from socio.factura_extra where id = @id_factura_extra_actividad;
 
 -- Mostrar estado de cuenta ANTES del pago de factura extra por actividad
@@ -949,7 +949,7 @@ print 'Procesando reintegro por lluvia...';
 exec socio.altaRegistroPileta @id_socio = @id_socio_pedro, @id_invitado = null, @fecha = '2024-01-25', @id_tarifa = 1;
 
 -- Procesar pago de pileta
-declare @id_factura_pileta_lluvia int, @monto_pileta_lluvia decimal(8,2);
+declare @id_factura_pileta_lluvia int, @monto_pileta_lluvia decimal(12,2);
 select @id_factura_pileta_lluvia = max(id) from socio.factura_extra where id_registro_pileta = 2;
 select @monto_pileta_lluvia = importe_total from socio.factura_extra where id = @id_factura_pileta_lluvia;
 
@@ -1081,7 +1081,7 @@ from socio.factura_extra
 where id = @id_factura_invitado;
 
 -- Procesar pago inmediato del invitado
-declare @monto_invitado decimal(8,2);
+declare @monto_invitado decimal(12,2);
 select @monto_invitado = importe_total from socio.factura_extra where id = @id_factura_invitado;
 
 -- Mostrar estado de cuenta ANTES del pago del invitado

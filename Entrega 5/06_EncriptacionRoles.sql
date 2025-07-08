@@ -1,22 +1,17 @@
 /*
-    Consigna: Creacion de Roles y Encriptacion de datos
-    Fecha de entrega: 24/06/2025
-    Número de comisión: 2900
-    Número de grupo: 11
+    Consigna: EncriptaciÃ³n de roles
+    Fecha de entrega: 08/07/2025
+    NÃºmero de comisiÃ³n: 2900
+    NÃºmero de grupo: 11
     Nombre de la materia: Bases de Datos Aplicadas
     Integrantes:
         - Costanzo, Marcos Ezequiel - 40955907
         - Sanchez, Diego Mauricio - 46361081
 */
+
 use Com2900G11;
 go
 
-/*create table general.roles
-(
-	id		int primary key identity(1,1),
-	area	varchar(25) check(area in ('Tesoreria','Socios','Autoridades')),
-	rol		varchar(30) collate modern_spanish_ci_ai
-);*/
 
 --CREACION DE ROLES
 create role presidente;
@@ -67,7 +62,6 @@ grant control on socio.socio to admin_socio;
 grant control on socio.tutor to admin_socio;
 grant control on socio.invitado to admin_socio;
 
-
 go
 
 
@@ -91,7 +85,7 @@ go
 create or alter view socio.ver_actividades
 with schemabinding
 as
-	select a.nombre
+	select s.id, a.nombre
 	from socio.socio s
 	join socio.cuota c on
 	c.id_socio = s.id
@@ -105,7 +99,6 @@ grant select on socio.ver_grupoFamiliar to socios_web;
 grant select on socio.ver_cuota to socios_web;
 grant select on socio.ver_actividades to socios_web;
 grant execute on socio.altaInscripcionActividad to socios_web;
-
 
 
 
@@ -135,6 +128,7 @@ begin
 
 end
 go
+
 create or alter procedure general.desencriptarEmpleado
 	@id int
 as

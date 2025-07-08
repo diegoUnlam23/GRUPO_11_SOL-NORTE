@@ -88,7 +88,7 @@ create table socio.categoria
 (
 	id			    int primary key identity(1,1),
 	nombre		    varchar(10) NOT NULL,
-	costo_mensual   decimal(8,2) NOT NULL CHECK(costo_mensual > 0),
+	costo_mensual   decimal(12,2) NOT NULL CHECK(costo_mensual > 0),
 	edad_min	    int NOT NULL,
 	edad_max	    int NOT NULL 
 );
@@ -99,7 +99,7 @@ create table socio.cuota
 	id					int primary key identity(1,1),
 	id_socio			int NOT NULL,
 	id_categoria		int NOT NULL,
-	monto_total			decimal(8,2),
+	monto_total			decimal(12,2),
 	anio				int NOT NULL,
 	mes					int NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
@@ -115,7 +115,7 @@ create table socio.invitado
 	apellido				varchar(100) NOT NULL,
 	dni						int UNIQUE NOT NULL CHECK(dni > 0),
 	email					varchar(254) CHECK(email like '_%@_%._%'),
-	saldo_a_favor			decimal(8,2) DEFAULT 0.00 NOT NULL
+	saldo_a_favor			decimal(12,2) DEFAULT 0.00 NOT NULL
 );
 go
 
@@ -123,7 +123,7 @@ create table socio.tarifa_pileta
 (
 	id		int primary key identity(1,1),
 	tipo	varchar(50) COLLATE modern_spanish_CI_AS CHECK(tipo IN('Socio','Invitado')),
-	precio	decimal(8,2) NOT NULL check(precio >= 0)
+	precio	decimal(12,2) NOT NULL check(precio >= 0)
 );
 go
 
@@ -144,7 +144,7 @@ create table general.actividad
 (
 	id		        int primary key identity(1,1),
 	nombre	        varchar(50) NOT NULL,
-	costo_mensual   decimal(8,2) NOT NULL
+	costo_mensual   decimal(12,2) NOT NULL
 );
 go
 
@@ -153,7 +153,7 @@ create table general.actividad_extra
 	id					int primary key identity(1,1),
 	id_socio			int NOT NULL,
 	nombre				varchar(50) NOT NULL,
-	costo				decimal(8,2) NOT NULL
+	costo				decimal(12,2) NOT NULL
 	foreign key (id_socio) references socio.socio(id)
 );
 go
@@ -200,7 +200,7 @@ create table socio.estado_cuenta
 	id				int primary key identity(1,1),
 	id_socio		int,
 	id_tutor		int,
-	saldo			decimal(8,2) NOT NULL,
+	saldo			decimal(12,2) NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_tutor) references socio.tutor(id)
 );
@@ -216,7 +216,7 @@ create table socio.factura_cuota
     iva                     varchar(50) NOT NULL,
 	fecha_vencimiento_1		date NOT NULL,
 	fecha_vencimiento_2		date NOT NULL,
-	importe_total			decimal(8,2),
+	importe_total			decimal(12,2),
 	descripcion 			varchar(100) NOT NULL,
 	id_cuota				int,
 	foreign key (id_cuota) references socio.cuota(id)
@@ -228,11 +228,11 @@ create table socio.item_factura_cuota
 	id			        int primary key identity(1,1),
 	id_factura_cuota 	int NOT NULL,
     cantidad            int NOT NULL,
-    precio_unitario     decimal(8,2) NOT NULL,
-    alicuota_iva        decimal(8,2) NOT NULL,
+    precio_unitario     decimal(12,2) NOT NULL,
+    alicuota_iva        decimal(12,2) NOT NULL,
     tipo_item           varchar(50) NOT NULL,
-    subtotal            decimal(8,2) NOT NULL,
-    importe_total       decimal(8,2) NOT NULL,
+    subtotal            decimal(12,2) NOT NULL,
+    importe_total       decimal(12,2) NOT NULL,
 	foreign key (id_factura_cuota) references socio.factura_cuota(id)
 );
 go
@@ -258,7 +258,7 @@ create table socio.factura_extra
     iva                     varchar(50) NOT NULL,
 	fecha_vencimiento_1		date NOT NULL,
 	fecha_vencimiento_2		date NOT NULL,
-	importe_total			decimal(8,2),
+	importe_total			decimal(12,2),
 	descripcion 			varchar(100) NOT NULL,
     id_registro_pileta		int,
 	id_actividad_extra		int,
@@ -272,11 +272,11 @@ create table socio.item_factura_extra
 	id			        int primary key identity(1,1),
 	id_factura_extra 	int NOT NULL,
     cantidad            int NOT NULL,
-    precio_unitario     decimal(8,2) NOT NULL,
-    alicuota_iva        decimal(8,2) NOT NULL,
+    precio_unitario     decimal(12,2) NOT NULL,
+    alicuota_iva        decimal(12,2) NOT NULL,
     tipo_item           varchar(50) NOT NULL,
-    subtotal            decimal(8,2) NOT NULL,
-    importe_total       decimal(8,2) NOT NULL,
+    subtotal            decimal(12,2) NOT NULL,
+    importe_total       decimal(12,2) NOT NULL,
 	foreign key (id_factura_extra) references socio.factura_extra(id)
 );
 go
@@ -285,7 +285,7 @@ create table socio.pago
 (
 	id						int primary key identity (1,1),
 	fecha_pago				date NOT NULL,
-	monto					decimal(8,2) NOT NULL,
+	monto					decimal(12,2) NOT NULL,
 	medio_de_pago			varchar(50) NOT NULL,
 	es_debito_automatico	bit default 0 NOT NULL,
 	id_factura_cuota		int,
@@ -307,7 +307,7 @@ create table socio.reembolso
 (
 	id					int primary key identity (1,1),
 	id_pago				int NOT NULL,
-	monto				decimal(8,2) NOT NULL,
+	monto				decimal(12,2) NOT NULL,
 	fecha_reembolso		datetime NOT NULL,
 	motivo				varchar(100) NOT NULL,
 	id_tipo_reembolso	int NOT NULL,
@@ -321,7 +321,7 @@ create table socio.movimiento_cuenta
 	id						int primary key identity (1,1),
 	id_estado_cuenta		int NOT NULL,
 	fecha					datetime NOT NULL,
-	monto					decimal(8,2) NOT NULL,
+	monto					decimal(12,2) NOT NULL,
 	id_factura				int,
 	id_pago					int,
 	id_reembolso			int,

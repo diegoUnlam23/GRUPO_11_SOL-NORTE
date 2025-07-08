@@ -131,7 +131,7 @@ BEGIN
         IF @id_cuota IS NULL
         BEGIN
             -- Obtener costo de la cuota según categoría
-            DECLARE @costo DECIMAL(8,2);
+            DECLARE @costo decimal(12,2);
             SELECT @costo = costo_mensual FROM socio.categoria WHERE id = @id_categoria;
 
             -- Insertar cuota

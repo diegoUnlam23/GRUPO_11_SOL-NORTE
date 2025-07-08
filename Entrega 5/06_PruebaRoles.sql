@@ -1,3 +1,14 @@
+/*
+    Consigna: Prueba de roles
+    Fecha de entrega: 08/07/2025
+    Número de comisión: 2900
+    Número de grupo: 11
+    Nombre de la materia: Bases de Datos Aplicadas
+    Integrantes:
+        - Costanzo, Marcos Ezequiel - 40955907
+        - Sanchez, Diego Mauricio - 46361081
+*/
+
 USE Com2900G11;
 GO
 
@@ -55,4 +66,3 @@ CREATE USER usr_admin_facturacion FOR LOGIN usr_admin_facturacion;
 ALTER ROLE admin_facturacion ADD MEMBER usr_admin_facturacion;
 
 GO
-

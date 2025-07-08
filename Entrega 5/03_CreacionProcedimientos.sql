@@ -486,7 +486,7 @@ create or alter procedure socio.altaInvitado
     @apellido varchar(100),
     @dni int,
     @email varchar(254),
-    @saldo_a_favor decimal(8,2) = 0
+    @saldo_a_favor decimal(12,2) = 0
 as
 begin
     SET NOCOUNT ON;
@@ -502,7 +502,7 @@ create or alter procedure socio.modificacionInvitado
     @apellido varchar(100),
     @dni int,
     @email varchar(254),
-    @saldo_a_favor decimal(8,2)
+    @saldo_a_favor decimal(12,2)
 as
 begin
     SET NOCOUNT ON;
@@ -602,7 +602,7 @@ go
 create or alter procedure general.altaActividadExtra
     @id_socio int,
     @nombre varchar(50),
-    @costo decimal(8,2)
+    @costo decimal(12,2)
 as
 begin
     SET NOCOUNT ON;
@@ -667,7 +667,7 @@ begin
     declare @fecha_vencimiento_1 date;
     declare @fecha_vencimiento_2 date;
     declare @descripcion varchar(100);
-    declare @importe_total decimal(8,2);
+    declare @importe_total decimal(12,2);
 
     -- Generar número de comprobante automáticamente
     select @numero_comprobante = isnull(max(numero_comprobante), 0) + 1 from socio.factura_extra;
@@ -689,7 +689,7 @@ begin
     set @fecha_vencimiento_2 = dateadd(day, 40, @fecha_emision);
 
     declare @id_tarifa int;
-    declare @precio_tarifa decimal(8,2);
+    declare @precio_tarifa decimal(12,2);
     declare @id_factura_extra int;
     declare @tipo_item varchar(50);
 
@@ -1003,7 +1003,7 @@ begin
         return;
     end
 
-    declare @monto_total decimal(8,2);
+    declare @monto_total decimal(12,2);
     select @monto_total = monto_total from socio.cuota where id = @id_cuota;
 
     if @monto_total is null
@@ -1012,7 +1012,7 @@ begin
         return;
     end
 
-    declare @precio_actividad decimal(8,2);
+    declare @precio_actividad decimal(12,2);
     select @precio_actividad = costo_mensual from general.actividad where id = @id_actividad;
 
     if @precio_actividad is null
@@ -1029,7 +1029,7 @@ begin
         values (@id_cuota, @id_actividad);
 
         -- Actualizar el monto total de la cuota sumandole el precio de la actividad
-        --declare @monto_total decimal(8,2);
+        --declare @monto_total decimal(12,2);
         select @monto_total = monto_total from socio.cuota where id = @id_cuota;
         set @monto_total = @monto_total + @precio_actividad;
 
@@ -1077,7 +1077,7 @@ begin
         return;
     end
 
-    declare @precio_actividad decimal(8,2);
+    declare @precio_actividad decimal(12,2);
     select @precio_actividad = costo_mensual from general.actividad where id = @id_actividad;
 
     if @precio_actividad is null
@@ -1093,7 +1093,7 @@ begin
         where id_cuota = @id_cuota and id_actividad = @id_actividad;
 
         -- Actualizar el monto total de la cuota restandole el precio de la actividad
-        declare @monto_total decimal(8,2);
+        declare @monto_total decimal(12,2);
         select @monto_total = monto_total from socio.cuota where id = @id_cuota;
         set @monto_total = @monto_total - @precio_actividad;
 
@@ -1119,7 +1119,7 @@ create or alter procedure socio.altaCuota
     @id_categoria int,
     @mes int,
     @anio int,
-    @monto_total decimal(8,2) = 0
+    @monto_total decimal(12,2) = 0
 as
 begin
     SET NOCOUNT ON;
@@ -1149,7 +1149,7 @@ go
 -- Update
 create or alter procedure socio.modificacionMontoCuota
     @id int,
-    @monto_total decimal(8,2)
+    @monto_total decimal(12,2)
 as
 begin
     SET NOCOUNT ON;
@@ -1173,18 +1173,18 @@ go
 -- Procedimiento para calcular descuentos en facturación
 create or alter procedure socio.calcularDescuentos
     @id_cuota int,
-    @costo_categoria decimal(8,2),
-    @total_actividades decimal(8,2),
-    @descuento_familiar decimal(8,2) output,
-    @descuento_actividades decimal(8,2) output,
-    @total_con_descuentos decimal(8,2) output
+    @costo_categoria decimal(12,2),
+    @total_actividades decimal(12,2),
+    @descuento_familiar decimal(12,2) output,
+    @descuento_actividades decimal(12,2) output,
+    @total_con_descuentos decimal(12,2) output
 as
 begin
     SET NOCOUNT ON;
     declare @id_socio int;
     declare @id_grupo_familiar int;
     declare @cantidad_actividades int;
-    declare @total_sin_descuentos decimal(8,2);
+    declare @total_sin_descuentos decimal(12,2);
     
     -- Inicializar variables
     set @descuento_familiar = 0;
@@ -1330,8 +1330,8 @@ begin
     -- Obtener datos de la cuota y del socio
     declare @id_socio int;
     declare @id_categoria int;
-    declare @monto_total_cuota decimal(8,2);
-    declare @costo_categoria decimal(8,2);
+    declare @monto_total_cuota decimal(12,2);
+    declare @costo_categoria decimal(12,2);
     declare @nombre_categoria varchar(10);
     declare @id_factura_cuota int;
     declare @id_estado_cuenta int;
@@ -1408,16 +1408,16 @@ begin
     end
 
     -- Calcular total de actividades
-    declare @total_actividades decimal(8,2);
+    declare @total_actividades decimal(12,2);
     select @total_actividades = isnull(sum(a.costo_mensual), 0)
     from socio.inscripcion_actividad ia
     inner join general.actividad a on ia.id_actividad = a.id
     where ia.id_cuota = @id_cuota;
 
     -- Calcular descuentos
-    declare @descuento_familiar decimal(8,2);
-    declare @descuento_actividades decimal(8,2);
-    declare @total_con_descuentos decimal(8,2);
+    declare @descuento_familiar decimal(12,2);
+    declare @descuento_actividades decimal(12,2);
+    declare @total_con_descuentos decimal(12,2);
 
     exec socio.calcularDescuentos
         @id_cuota = @id_cuota,
@@ -1427,7 +1427,7 @@ begin
         @descuento_actividades = @descuento_actividades output,
         @total_con_descuentos = @total_con_descuentos output;
 
-    declare @importe_total decimal(8,2) = @total_con_descuentos;
+    declare @importe_total decimal(12,2) = @total_con_descuentos;
 
     begin try
         begin transaction;
@@ -1448,7 +1448,7 @@ begin
             @descuento_familiar = @descuento_familiar, 
             @descuento_actividades = @descuento_actividades;
 
-        declare @monto_negativo decimal(8,2) = @importe_total * -1;
+        declare @monto_negativo decimal(12,2) = @importe_total * -1;
 
         -- Insertar movimiento de cuenta (monto negativo porque es una factura)
         exec socio.altaMovimientoCuenta
@@ -1478,8 +1478,8 @@ go
 -- Insert
 create or alter procedure socio.altaItemFacturaCuota
     @id_factura_cuota int,
-    @descuento_familiar decimal(8,2) = 0,
-    @descuento_actividades decimal(8,2) = 0
+    @descuento_familiar decimal(12,2) = 0,
+    @descuento_actividades decimal(12,2) = 0
 as
 begin
     if not exists (select 1 from socio.factura_cuota where id = @id_factura_cuota)
@@ -1491,9 +1491,9 @@ begin
     declare @id_cuota int;
     declare @id_socio int;
     declare @id_categoria int;
-    declare @costo_categoria decimal(8,2);
+    declare @costo_categoria decimal(12,2);
     declare @nombre_categoria varchar(10);
-    declare @total_actividades decimal(8,2);
+    declare @total_actividades decimal(12,2);
     declare @cantidad_actividades int;
 
     -- Obtener información de la factura y cuota
@@ -1541,10 +1541,10 @@ begin
         begin transaction;
 
         -- Calcular descuento aplicado a la categoría (proporcional al descuento familiar)
-        declare @descuento_categoria decimal(8,2) = 0;
+        declare @descuento_categoria decimal(12,2) = 0;
         if @descuento_familiar > 0
         begin
-            declare @total_sin_descuentos decimal(8,2) = @costo_categoria + @total_actividades;
+            declare @total_sin_descuentos decimal(12,2) = @costo_categoria + @total_actividades;
             if @total_sin_descuentos > 0
                 set @descuento_categoria = (@costo_categoria / @total_sin_descuentos) * @descuento_familiar;
         end
@@ -1561,10 +1561,10 @@ begin
         if @cantidad_actividades > 0
         begin
             -- Calcular descuento familiar por actividad (proporcional)
-            declare @descuento_familiar_por_actividad decimal(8,2) = 0;
+            declare @descuento_familiar_por_actividad decimal(12,2) = 0;
             if @descuento_familiar > 0
             begin
-                declare @total_sin_descuentos_act decimal(8,2) = @costo_categoria + @total_actividades;
+                declare @total_sin_descuentos_act decimal(12,2) = @costo_categoria + @total_actividades;
                 if @total_sin_descuentos_act > 0
                     set @descuento_familiar_por_actividad = (@total_actividades / @total_sin_descuentos_act) * @descuento_familiar / @cantidad_actividades;
             end
@@ -1623,7 +1623,7 @@ go
 create or alter procedure socio.altaEstadoCuenta
     @id_socio int = null,
     @id_tutor int = null,
-    @saldo decimal(8,2) = 0
+    @saldo decimal(12,2) = 0
 as
 begin
     -- Validar que se proporcione al menos uno de los dos parámetros
@@ -1683,7 +1683,7 @@ go
 -- Insert
 create or alter procedure socio.altaMovimientoCuenta
     @id_estado_cuenta int,
-    @monto decimal(8,2),
+    @monto decimal(12,2),
     @id_factura int = null,
     @id_pago int = null,
     @id_reembolso int = null
@@ -1711,7 +1711,7 @@ go
 create or alter procedure socio.modificacionEstadoCuenta
     @id_socio int = null,
     @id_tutor int = null,
-    @monto decimal(8,2)
+    @monto decimal(12,2)
 as
 begin
     -- Validar que se proporcione al menos uno de los dos parámetros
@@ -1777,7 +1777,7 @@ go
 -- Insert
 create or alter procedure socio.altaPago
     @fecha_pago date = null,
-    @monto decimal(8,2),
+    @monto decimal(12,2),
     @medio_de_pago varchar(50),
     @es_debito_automatico bit = 0,
     @id_factura_cuota int = null,
@@ -1806,14 +1806,14 @@ begin
     declare @id_pago int;
     declare @id_socio_responsable int;
     declare @id_estado_cuenta int;
-    declare @importe_factura decimal(8,2);
+    declare @importe_factura decimal(12,2);
     declare @tipo_factura varchar(20);
     declare @message varchar(50);
     declare @es_invitado bit = 0;
     declare @id_invitado int;
-    declare @saldo_disponible decimal(8,2) = 0;
-    declare @monto_a_descontar decimal(8,2) = 0;
-    declare @monto_negativo decimal(8,2) = 0;
+    declare @saldo_disponible decimal(12,2) = 0;
+    declare @monto_a_descontar decimal(12,2) = 0;
+    declare @monto_negativo decimal(12,2) = 0;
     declare @id_cuota int;
     declare @id_socio int;
     declare @responsable_pago bit;
@@ -2126,7 +2126,7 @@ begin
                 end
 
                 -- Generar movimiento de cuenta por el monto neto del pago (monto total - saldo a favor utilizado)
-                declare @monto_neto decimal(8,2);
+                declare @monto_neto decimal(12,2);
                 set @monto_neto = @monto - @monto_a_descontar;
 
                 if @monto_neto > 0
@@ -2144,7 +2144,7 @@ begin
                 end
 
                 -- Obtener el saldo final después de todas las actualizaciones
-                declare @saldo_final decimal(8,2);
+                declare @saldo_final decimal(12,2);
                 if @es_tutor = 1
                     select @saldo_final = saldo from socio.estado_cuenta where id_tutor = @id_socio_responsable;
                 else
@@ -2161,7 +2161,7 @@ begin
         commit transaction;
 
         -- Mostrar resumen del pago procesado
-        print '=== RESUMEN DEL PAGO ===';
+        /*print '=== RESUMEN DEL PAGO ===';
         print 'Monto de la factura: $' + cast(@importe_factura as varchar(15));
         print 'Monto pagado: $' + cast(@monto as varchar(15));
         print 'Saldo disponible: $' + cast(@saldo_disponible as varchar(15));
@@ -2197,7 +2197,7 @@ begin
                     print 'No se utilizó saldo a favor';
             end
         end
-        print '========================';
+        print '========================';*/
 
     end try
     begin catch
@@ -2219,8 +2219,8 @@ create or alter procedure socio.altaReembolso
     @porcentaje_reembolso decimal(5,2) = 100.00
 as
 begin
-    declare @monto decimal(8,2);
-    declare @monto_pago decimal(8,2);
+    declare @monto decimal(12,2);
+    declare @monto_pago decimal(12,2);
     
     -- Validar que el pago existe y obtener su monto
     select @monto_pago = monto 
@@ -2491,8 +2491,8 @@ begin
             id_socio int,
             id_invitado int,
             id_tarifa int,
-            precio_tarifa decimal(8,2),
-            monto_reintegro decimal(8,2),
+            precio_tarifa decimal(12,2),
+            monto_reintegro decimal(12,2),
             id_responsable_pago int,
             tipo_usuario varchar(10),
             id_factura_extra int
@@ -2532,8 +2532,8 @@ begin
         declare @id_socio int;
         declare @id_invitado int;
         declare @id_tarifa int;
-        declare @precio_tarifa decimal(8,2);
-        declare @monto_reintegro decimal(8,2);
+        declare @precio_tarifa decimal(12,2);
+        declare @monto_reintegro decimal(12,2);
         declare @id_responsable_pago int;
         declare @tipo_usuario varchar(10);
         declare @id_factura_extra int;
@@ -2633,7 +2633,7 @@ go
 -- Insert
 create or alter procedure general.altaActividad
     @nombre varchar(50),
-    @costo_mensual decimal(8,2)
+    @costo_mensual decimal(12,2)
 as
 begin
     set nocount on;
@@ -2659,7 +2659,7 @@ go
 create or alter procedure general.modificacionActividad
     @id int,
     @nombre varchar(50),
-    @costo_mensual decimal(8,2)
+    @costo_mensual decimal(12,2)
 as
 begin
     if not exists (select 1 from general.actividad where id = @id)
@@ -2719,7 +2719,7 @@ go
 -- Insert
 create or alter procedure socio.altaCategoria
     @nombre varchar(50),
-    @costo_mensual decimal(8,2),
+    @costo_mensual decimal(12,2),
     @edad_min int,
     @edad_max int
 as
@@ -2759,7 +2759,7 @@ go
 create or alter procedure socio.modificacionCategoria
     @id int,
     @nombre varchar(50),
-    @costo_mensual decimal(8,2),
+    @costo_mensual decimal(12,2),
     @edad_min int,
     @edad_max int
 as
@@ -2805,7 +2805,7 @@ go
 
 create or alter procedure socio.modificarPrecioCategoria
     @id int,
-    @costo_mensual decimal(8,2)
+    @costo_mensual decimal(12,2)
 as
 begin
     if not exists (select 1 from socio.categoria where id = @id)
@@ -2852,7 +2852,7 @@ go
 -- Insert
 create or alter procedure socio.altaTarifaPileta
     @tipo varchar(20),
-    @precio decimal(8,2)
+    @precio decimal(12,2)
 as
 begin
     if @precio <= 0
@@ -2876,7 +2876,7 @@ go
 create or alter procedure socio.modificacionTarifaPileta
     @id int,
     @tipo varchar(20),
-    @precio decimal(8,2)
+    @precio decimal(12,2)
 as
 begin
     if not exists (select 1 from socio.tarifa_pileta where id = @id)
@@ -2980,7 +2980,7 @@ begin
     order by rp.fecha desc;
 
     -- Mostrar resumen de uso
-    declare @total_uso decimal(8,2);
+    declare @total_uso decimal(12,2);
     declare @cantidad_visitas int;
     
     select @total_uso = isnull(sum(tp.precio), 0),
@@ -2994,7 +2994,7 @@ begin
     print 'Total gastado en pileta: $' + cast(@total_uso as varchar(10));
     print 'Cantidad de visitas: ' + cast(@cantidad_visitas as varchar(10));
     
-    declare @saldo_actual decimal(8,2);
+    declare @saldo_actual decimal(12,2);
     select @saldo_actual = saldo_a_favor from socio.invitado where id = @id;
     print 'Saldo a favor actual: $' + cast(@saldo_actual as varchar(10));
     
@@ -3025,7 +3025,7 @@ begin
         begin transaction;
 
         -- Obtener todos los responsables de débito automático activos (socios y tutores)
-        declare @socios table (id_responsable_pago int, id_cuota int, monto_cuota decimal(8,2), es_tutor bit, medio_de_pago varchar(50));
+        declare @socios table (id_responsable_pago int, id_cuota int, monto_cuota decimal(12,2), es_tutor bit, medio_de_pago varchar(50));
 
         insert into @socios (id_responsable_pago, id_cuota, monto_cuota, es_tutor, medio_de_pago)
         -- Socios responsables de pago
@@ -3087,7 +3087,7 @@ begin
 
 
         -- Variables para iterar
-        declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(8,2), @es_tutor bit, @medio_de_pago varchar(50);
+        declare @id_responsable_pago int, @id_cuota int, @monto_cuota decimal(12,2), @es_tutor bit, @medio_de_pago varchar(50);
         declare @id_factura_cuota int, @id_pago int;
 
         -- Iterar sobre la tabla de responsables adheridos al débito automático
@@ -3100,7 +3100,7 @@ begin
             select @id_factura_cuota = max(id) from socio.factura_cuota where id_cuota = @id_cuota;
 
             -- Obtener el importe real de la factura (con descuentos)
-            declare @monto_factura decimal(8,2);
+            declare @monto_factura decimal(12,2);
             select @monto_factura = importe_total from socio.factura_cuota where id = @id_factura_cuota;
 
             -- Generar pago de la factura
@@ -3439,7 +3439,7 @@ begin
     declare @anio int;
     declare @mes_siguiente int;
     declare @anio_siguiente int;
-    declare @monto_total decimal(8,2);
+    declare @monto_total decimal(12,2);
 
     declare @fecha_actual date = getdate();
 
@@ -3470,7 +3470,7 @@ begin
     end
 
     -- Verificar que la cuota anterior esté pagada
-    if not exists (
+    /*if not exists (
         select 1 from socio.factura_cuota fc 
         inner join socio.pago p on fc.id = p.id_factura_cuota 
         where fc.id_cuota = @id_cuota
@@ -3478,12 +3478,12 @@ begin
     begin
         raiserror('No se puede copiar una cuota que no está pagada.', 16, 1);
         return;
-    end
+    end*/ -- MC
 
     -- Verificar que no exista ya una cuota para el mes siguiente
     if exists (select 1 from socio.cuota where id_socio = @id_socio and mes = @mes_siguiente and anio = @anio_siguiente)
     begin
-        -- raiserror('Ya existe una cuota para el mes siguiente.', 16, 1); MC
+        -- raiserror('Ya existe una cuota para el mes siguiente. Intente generarlo con la cuota más reciente.', 16, 1); -- MC
         return;
     end
 
@@ -3507,7 +3507,7 @@ begin
             where id_cuota = @id_cuota;
 
             -- Vamos a calcular el monto total de las actividades copiadas por si hubo aumento de precio
-            declare @monto_total_actividades decimal(8,2);
+            declare @monto_total_actividades decimal(12,2);
             select @monto_total_actividades = isnull(sum(a.costo_mensual), 0)
             from socio.inscripcion_actividad ia
             inner join general.actividad a on ia.id_actividad = a.id
@@ -3526,7 +3526,7 @@ begin
 
             -- Buscamos la nueva categoria (por si cambia)
             declare @id_categoria_nueva int;
-            declare @monto_categoria_nueva decimal(8,2);
+            declare @monto_categoria_nueva decimal(12,2);
             select @id_categoria_nueva = id, @monto_categoria_nueva = costo_mensual
             from socio.categoria
             where edad_min <= @edad_nueva and edad_max >= @edad_nueva;
@@ -3581,7 +3581,7 @@ begin
     -- Obtener información de la factura
     declare @id_cuota int;
     declare @id_socio int;
-    declare @importe_total decimal(8,2);
+    declare @importe_total decimal(12,2);
     declare @numero_comprobante int;
     declare @fecha_emision date;
     declare @id_tutor int;
@@ -3691,38 +3691,5 @@ begin
         raiserror('Error al generar la Nota de Crédito: %s', 16, 1, @ErrorMessage);
         return;
     end catch
-end
-go
-
-create or alter procedure socio.generarFacturasMasivas
-    @mes int,
-    @anio int
-as
-begin
-    SET NOCOUNT ON;
-
-    -- Buscamos las cuotas correspondientes a ese mes y año
-    declare @cuotas table (id int, id_socio int);
-    insert into @cuotas (id, id_socio)
-    select id, id_socio
-    from socio.cuota
-    where mes = @mes and anio = @anio;
-
-    -- Transformo el mes y año a fecha
-    declare @fecha_emision date = datefromparts(@anio, @mes, 1);
-    
-    -- Iteramos sobre las cuotas y llamamos a altaFacturaCuota
-    declare @id_cuota int;
-    declare @id_socio int;
-
-    while exists (select 1 from @cuotas)
-    begin
-        select top 1 @id_cuota = id, @id_socio = id_socio
-        from @cuotas;
-
-        exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
-
-        delete from @cuotas where id = @id_cuota;
-    end
 end
 go

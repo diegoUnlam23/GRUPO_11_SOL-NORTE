@@ -312,7 +312,7 @@ where ec.id_socio in (@id_padre, @id_hijo1, @id_hija)
 order by s.fecha_nacimiento;
 
 -- Obtener montos de las facturas
-declare @monto_factura_padre decimal(8,2), @monto_factura_hijo decimal(8,2), @monto_factura_hija decimal(8,2);
+declare @monto_factura_padre decimal(12,2), @monto_factura_hijo decimal(12,2), @monto_factura_hija decimal(12,2);
 select @monto_factura_padre = importe_total from socio.factura_cuota where id = @id_factura_padre;
 select @monto_factura_hijo = importe_total from socio.factura_cuota where id = @id_factura_hijo;
 select @monto_factura_hija = importe_total from socio.factura_cuota where id = @id_factura_hija;
@@ -419,7 +419,7 @@ print '2.6.2 PAGO DE FACTURAS EXTRA POR EL RESPONSABLE';
 print 'Procesando pagos de facturas extra por el responsable...';
 
 -- Obtener montos de las facturas extra
-declare @monto_factura_tomas decimal(8,2), @monto_factura_sofia decimal(8,2);
+declare @monto_factura_tomas decimal(12,2), @monto_factura_sofia decimal(12,2);
 select @monto_factura_tomas = importe_total from socio.factura_extra where id = @id_factura_tomas;
 select @monto_factura_sofia = importe_total from socio.factura_extra where id = @id_factura_sofia;
 
@@ -600,7 +600,7 @@ select @id_factura_tomas_lluvia = max(id) from socio.factura_extra where id_regi
 select @id_factura_sofia_lluvia = max(id) from socio.factura_extra where id_registro_pileta = @id_registro_sofia_lluvia;
 
 -- Procesar pagos de las facturas extra
-declare @monto_factura_tomas_lluvia decimal(8,2), @monto_factura_sofia_lluvia decimal(8,2);
+declare @monto_factura_tomas_lluvia decimal(12,2), @monto_factura_sofia_lluvia decimal(12,2);
 select @monto_factura_tomas_lluvia = importe_total from socio.factura_extra where id = @id_factura_tomas_lluvia;
 select @monto_factura_sofia_lluvia = importe_total from socio.factura_extra where id = @id_factura_sofia_lluvia;
 
@@ -704,7 +704,7 @@ order by s.fecha_nacimiento;
 
 -- Procesar pagos de actividades extra
 declare @id_factura_actividad_tomas int, @id_factura_actividad_sofia int;
-declare @monto_actividad_tomas decimal(8,2), @monto_actividad_sofia decimal(8,2);
+declare @monto_actividad_tomas decimal(12,2), @monto_actividad_sofia decimal(12,2);
 
 select @id_factura_actividad_tomas = fe.id, @monto_actividad_tomas = fe.importe_total
 from socio.factura_extra fe
@@ -765,7 +765,7 @@ order by i.nombre;
 
 -- Procesar pagos de invitados
 declare @id_factura_invitado_carlos int, @id_factura_invitado_ana int;
-declare @monto_invitado_carlos decimal(8,2), @monto_invitado_ana decimal(8,2);
+declare @monto_invitado_carlos decimal(12,2), @monto_invitado_ana decimal(12,2);
 
 select @id_factura_invitado_carlos = fe.id, @monto_invitado_carlos = fe.importe_total
 from socio.factura_extra fe

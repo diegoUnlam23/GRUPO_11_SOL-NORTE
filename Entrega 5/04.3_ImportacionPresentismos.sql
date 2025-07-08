@@ -211,7 +211,7 @@ begin
 
 	-- 3. Obtener todas las cuotas a procesar (nuevas y existentes)
 	if object_id('tempdb..#cuotas_mes') is not null drop table #cuotas_mes;
-	select c.id as id_cuota, c.id_socio, c.id_categoria, c.anio, c.mes
+	select c.id as id_cuota, c.id_socio, c.id_categoria, c.anio, c.mes, procesado = 0
 	into #cuotas_mes
 	from socio.cuota c
 	inner join (
@@ -244,7 +244,6 @@ begin
 	);
 
 	-- 6. Llamar a altaFacturaCuota para cada cuota generada
-	alter table #cuotas_mes add procesado bit default 0;
 	update #cuotas_mes set procesado = 0 where procesado is null;
 
 	declare @id_cuota int, @anio int, @mes int, @fecha_emision date;
@@ -261,9 +260,11 @@ begin
 
 		update #cuotas_mes set procesado = 1 where id_cuota = @id_cuota;
 
-		/*-- En caso de que pidan hacer de cuenta que fueron pagas, generamos los pagos.
+
+		-- COMENTAR ESTO EN CASO DE NO QUERER GENERAR PAGOS
+		-- En caso de que pidan hacer de cuenta que fueron pagas, generamos los pagos.
 		-- Obtenemos el monto de la cuota
-		declare @monto_cuota decimal(8,2);
+		/*declare @monto_cuota decimal(12,2);
 		select @monto_cuota = monto_total from socio.cuota where id = @id_cuota;
 
 		-- Obtenemos el id de la factura de la cuota
@@ -272,6 +273,7 @@ begin
 
 		-- Generamos el pago
 		exec socio.altaPago
+			@fecha_pago = @fecha_emision,
 			@monto = @monto_cuota,
 			@medio_de_pago = 'Visa',
 			@es_debito_automatico = 0,

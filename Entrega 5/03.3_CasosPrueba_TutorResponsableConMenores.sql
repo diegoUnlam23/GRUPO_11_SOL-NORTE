@@ -276,7 +276,7 @@ print '';
 print '3.6 PROCESAMIENTO DE PAGO DE FACTURAS DE CUOTA (POR EL TUTOR)';
 print 'Procesando pago de ambas facturas de cuota por parte del tutor responsable...';
 
-declare @monto_factura_martin decimal(8,2), @monto_factura_lucia decimal(8,2);
+declare @monto_factura_martin decimal(12,2), @monto_factura_lucia decimal(12,2);
 select @monto_factura_martin = importe_total from socio.factura_cuota where id = @id_factura_cuota_martin;
 select @monto_factura_lucia = importe_total from socio.factura_cuota where id = @id_factura_cuota_lucia;
 select @id_tutor_gabriela = id from socio.tutor where dni = 23456789;
@@ -387,7 +387,7 @@ print '';
 print '3.8 PAGO DE FACTURA EXTRA POR USO DE PILETA';
 print 'Procesando pago de las facturas extra por uso de pileta (por el tutor)...';
 
-declare @monto_factura_extra_martin decimal(8,2), @monto_factura_extra_lucia decimal(8,2);
+declare @monto_factura_extra_martin decimal(12,2), @monto_factura_extra_lucia decimal(12,2);
 select @monto_factura_extra_martin = importe_total from socio.factura_extra where id = @id_factura_extra_martin;
 select @monto_factura_extra_lucia = importe_total from socio.factura_extra where id = @id_factura_extra_lucia;
 
@@ -470,7 +470,7 @@ print '';
 print '3.10 PAGO DE FACTURA EXTRA POR ACTIVIDAD EXTRA';
 print 'Procesando pago de la factura extra por actividad extra (por el tutor)...';
 
-declare @monto_factura_extra_actividad decimal(8,2);
+declare @monto_factura_extra_actividad decimal(12,2);
 select @monto_factura_extra_actividad = importe_total from socio.factura_extra where id = @id_factura_extra_actividad;
 
 -- Estado de cuenta del tutor ANTES del pago de factura extra por actividad
@@ -718,7 +718,7 @@ print 'Simulando uso de pileta por Martín Fernández en día de lluvia y reinte
 
 -- Registrar uso de pileta en día de lluvia
 exec socio.altaRegistroPileta @id_socio = @id_socio_martin, @id_invitado = null, @fecha = '2024-02-20', @id_tarifa = 1;
-declare @id_factura_pileta_lluvia int, @monto_pileta_lluvia decimal(8,2);
+declare @id_factura_pileta_lluvia int, @monto_pileta_lluvia decimal(12,2);
 select @id_factura_pileta_lluvia = max(id) from socio.factura_extra where id_registro_pileta = (select max(id) from socio.registro_pileta where id_socio = @id_socio_martin and fecha = '2024-02-20');
 select @monto_pileta_lluvia = importe_total from socio.factura_extra where id = @id_factura_pileta_lluvia;
 
@@ -858,7 +858,7 @@ declare @id_invitado int;
 select @id_invitado = id from socio.invitado where dni = 77777777;
 
 exec socio.altaRegistroPileta @id_socio = null, @id_invitado = @id_invitado, @fecha = '2024-02-22', @id_tarifa = 2;
-declare @id_factura_invitado int, @monto_invitado decimal(8,2);
+declare @id_factura_invitado int, @monto_invitado decimal(12,2);
 select @id_factura_invitado = max(id) from socio.factura_extra where id_registro_pileta = (select max(id) from socio.registro_pileta where id_invitado = (select id from socio.invitado where dni = 77777777));
 select @monto_invitado = importe_total from socio.factura_extra where id = @id_factura_invitado;
 
