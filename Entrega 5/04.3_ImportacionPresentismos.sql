@@ -264,7 +264,7 @@ begin
 		-- COMENTAR ESTO EN CASO DE NO QUERER GENERAR PAGOS
 		-- En caso de que pidan hacer de cuenta que fueron pagas, generamos los pagos.
 		-- Obtenemos el monto de la cuota
-		/*declare @monto_cuota decimal(12,2);
+		declare @monto_cuota decimal(12,2);
 		select @monto_cuota = monto_total from socio.cuota where id = @id_cuota;
 
 		-- Obtenemos el id de la factura de la cuota
@@ -277,7 +277,7 @@ begin
 			@monto = @monto_cuota,
 			@medio_de_pago = 'Visa',
 			@es_debito_automatico = 0,
-			@id_factura_cuota = @id_factura_cuota;*/
+			@id_factura_cuota = @id_factura_cuota;
 	end
 
 	-- Eliminar tablas temporales

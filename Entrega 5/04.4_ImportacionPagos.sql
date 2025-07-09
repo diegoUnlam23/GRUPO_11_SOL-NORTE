@@ -177,9 +177,9 @@ BEGIN
 
         -- Insertar el item de la factura
         INSERT INTO socio.item_factura_cuota (
-            id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+            id_factura_cuota, cantidad, precio_unitario, tipo_item, subtotal, importe_total
         )
-        VALUES(@id_factura, 1, @valor, 21, 'Cuota', @valor, @valor);
+        VALUES(@id_factura, 1, @valor, 'Cuota', @valor, @valor);
 
         -- Insertar el pago
         INSERT INTO socio.pago(

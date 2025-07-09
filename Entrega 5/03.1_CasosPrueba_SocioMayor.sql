@@ -217,7 +217,6 @@ select
     tipo_item as Concepto,
     cantidad as Cantidad,
     precio_unitario as Precio_Unitario,
-    alicuota_iva as Alicuota_IVA,
     subtotal as Subtotal,
     importe_total as Importe_Total
 from socio.item_factura_cuota

@@ -20,6 +20,12 @@ begin
     exec general.altaActividad @nombre = 'Natación', @costo_mensual = 45000.00;
     exec general.altaActividad @nombre = 'Ajedrez', @costo_mensual = 20000.00;
 
+    exec socio.altaTipoReembolso @descripcion = 'Pago a cuenta';
+    exec socio.altaTipoReembolso @descripcion = 'Reembolso al medio de pago';
+
+    exec socio.altaTarifaPileta @tipo = 'Socio', @precio = 25000.00;
+    exec socio.altaTarifaPileta @tipo = 'Invitado', @precio = 30000.00;
+
     declare @ruta_socios varchar(255) = @ruta_general + '\socios.csv';
     declare @ruta_grupo_familiar varchar(255) = @ruta_general + '\grupo-familiar.csv';
     declare @ruta_presentismo varchar(255) = @ruta_general + '\presentismo.csv';

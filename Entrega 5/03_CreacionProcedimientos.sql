@@ -536,10 +536,9 @@ go
 ---- Registro Pileta ----
 -- Insert
 create or alter procedure socio.altaRegistroPileta
-    @id_socio int,
-    @id_invitado int,
-    @fecha date,
-    @id_tarifa int
+    @id_socio int = null,
+    @id_invitado int = null,
+    @fecha date
 as
 begin
     SET NOCOUNT ON;
@@ -557,12 +556,6 @@ begin
         return;
     end
 
-    if not exists (select 1 from socio.tarifa_pileta where id = @id_tarifa)
-    begin
-        raiserror('No existe una tarifa con ese ID.', 16, 1);
-        return;
-    end
-
     -- Validar que no exista ya un registro para el mismo socio o invitado en la misma fecha
     if @id_socio is not null and exists (select 1 from socio.registro_pileta where id_socio = @id_socio and fecha = @fecha)
     begin
@@ -576,11 +569,35 @@ begin
         return;
     end
 
+    -- Obtener id de la tarifa si es socio o invitado
+    declare @id_tarifa_pileta int;
+    if @id_socio is not null
+    begin
+        select @id_tarifa_pileta = id from socio.tarifa_pileta where tipo = 'Socio';
+    end
+    else if @id_invitado is not null
+    begin
+        select @id_tarifa_pileta = id from socio.tarifa_pileta where tipo = 'Invitado';
+    end
+
+    -- Validar que la fecha sea mayor a la fecha de inscripcion del socio o invitado
+    declare @fecha_inscripcion date;
+    if @id_socio is not null
+    begin
+        select @fecha_inscripcion = fecha_inscripcion from socio.inscripcion where id_socio = @id_socio;
+        
+        if @fecha < @fecha_inscripcion
+        begin
+            raiserror('La fecha de registro de pileta debe ser mayor a la fecha de inscripción del socio o invitado.', 16, 1);
+            return;
+        end
+    end
+
     begin try
         begin transaction;
 
         insert into socio.registro_pileta (id_socio, id_invitado, fecha, id_tarifa)
-        values (@id_socio, @id_invitado, @fecha, @id_tarifa);
+        values (@id_socio, @id_invitado, @fecha, @id_tarifa_pileta);
 
         set @id_registro_pileta = scope_identity();
 
@@ -744,6 +761,9 @@ begin
         set @tipo_item = @nombre_actividad_extra;
     end
 
+    -- Sumarle el 21% de IVA
+    set @importe_total = @importe_total * 1.21;
+
     -- Insertar la factura extra
     insert into socio.factura_extra (
         numero_comprobante, tipo_comprobante, fecha_emision, periodo_facturado, iva,
@@ -756,9 +776,9 @@ begin
 
     -- Insertar el item de la factura extra
     insert into socio.item_factura_extra (
-        id_factura_extra, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+        id_factura_extra, cantidad, precio_unitario, tipo_item, subtotal, importe_total
     ) values (
-        @id_factura_extra, 1, @precio_tarifa, 21, @tipo_item, @precio_tarifa, @precio_tarifa
+        @id_factura_extra, 1, @precio_tarifa, @tipo_item, @precio_tarifa, @precio_tarifa
     );
 end
 go
@@ -919,6 +939,27 @@ begin
     if not exists (select 1 from general.clase where id = @id_clase)
     begin
         raiserror('No existe una clase con ese ID.', 16, 1);
+        return;
+    end
+
+    -- Verificamos que el socio esté inscrito en la actividad de la clase a traves de la cuota
+    declare @id_actividad int;
+    
+    select @id_actividad = c.id_actividad
+    from general.clase c
+    where c.id = @id_clase;
+
+    if not exists (
+        select 1 
+            from socio.socio s
+            join socio.cuota c  on s.id = c.id_socio
+            join socio.inscripcion_actividad ia on c.id = ia.id_cuota
+            where ia.id_actividad = @id_actividad and s.id = @id_socio
+            and MONTH(@fecha) = c.mes
+            and YEAR(@fecha) = c.anio
+    )
+    begin
+        raiserror('El socio no está inscrito en la actividad de la clase.', 16, 1);
         return;
     end
 
@@ -1116,7 +1157,6 @@ go
 -- Insert
 create or alter procedure socio.altaCuota
     @id_socio int,
-    @id_categoria int,
     @mes int,
     @anio int,
     @monto_total decimal(12,2) = 0
@@ -1129,20 +1169,45 @@ begin
         return;
     end
 
-    if not exists (select 1 from socio.categoria where id = @id_categoria)
-    begin
-        raiserror('No existe una categoria con ese ID.', 16, 1);
-        return;
-    end
-
     if exists (select 1 from socio.cuota where id_socio = @id_socio and mes = @mes and anio = @anio)
     begin
         raiserror('Ya existe una cuota para ese socio en ese mes y año.', 16, 1);
         return;
     end
 
+    -- Si la fecha de socio.inscripcion es menor al periodo pedido, no se puede crear la cuota
+    declare @fecha_inscripcion date;
+    select @fecha_inscripcion = fecha_inscripcion
+    from socio.inscripcion
+    where id_socio = @id_socio;
+    
+    if @fecha_inscripcion > datefromparts(@anio, @mes, 1)
+    begin
+        raiserror('La fecha de inscripción del socio es menor al periodo pedido.', 16, 1);
+        return;
+    end
+
+    -- Calculamos la edad para obtener el precio de la categoria
+    declare @edad_socio int;
+    declare @fecha_nacimiento_socio date;
+    select @fecha_nacimiento_socio = fecha_nacimiento
+    from socio.socio
+    where id = @id_socio;
+
+    declare @fecha_actual date = getdate();
+    select @edad_socio = datediff(YEAR, @fecha_nacimiento_socio, @fecha_actual);
+    if dateadd(year, @edad_socio, @fecha_nacimiento_socio) > cast(@fecha_actual as date)
+        set @edad_socio = @edad_socio - 1;
+
+    -- Con la edad del socio, buscamos el precio de la categoria
+    declare @precio_categoria decimal(12,2);
+    declare @id_categoria int;
+    select @precio_categoria = costo_mensual, @id_categoria = id
+    from socio.categoria
+    where edad_min <= @edad_socio and edad_max >= @edad_socio;
+
     insert into socio.cuota (id_socio, id_categoria, mes, anio, monto_total)
-    values (@id_socio, @id_categoria, @mes, @anio, @monto_total);
+    values (@id_socio, @id_categoria, @mes, @anio, @precio_categoria);
 end
 go
 
@@ -1309,11 +1374,11 @@ begin
         raiserror('No existe una cuota con ese ID.', 16, 1);
         return;
     end
-    if @anio_cuota <> @anio_param or @mes_cuota <> @mes_param
+    /*if @anio_cuota <> @anio_param or @mes_cuota <> @mes_param
     begin
         raiserror('La cuota asociada no corresponde al periodo de la fecha de emisión enviada.', 16, 1);
         return;
-    end
+    end*/
 
     -- Generar valores automáticamente
     declare @numero_comprobante int;
@@ -1428,6 +1493,9 @@ begin
         @total_con_descuentos = @total_con_descuentos output;
 
     declare @importe_total decimal(12,2) = @total_con_descuentos;
+
+    -- Sumarle el 21% de IVA
+    set @importe_total = @importe_total * 1.21;
 
     begin try
         begin transaction;
@@ -1551,9 +1619,9 @@ begin
 
         -- Insertar item de la categoría con descuento familiar aplicado
         insert into socio.item_factura_cuota (
-            id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+            id_factura_cuota, cantidad, precio_unitario, tipo_item, subtotal, importe_total
         ) values (
-            @id_factura_cuota, 1, @costo_categoria, 21, 'Categoría - ' + @nombre_categoria, 
+            @id_factura_cuota, 1, @costo_categoria, 'Categoría - ' + @nombre_categoria, 
             @costo_categoria, @costo_categoria - @descuento_categoria
         );
 
@@ -1570,13 +1638,12 @@ begin
             end
 
             insert into socio.item_factura_cuota (
-                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+                id_factura_cuota, cantidad, precio_unitario, tipo_item, subtotal, importe_total
             )
             select 
                 @id_factura_cuota,
                 1,
                 a.costo_mensual,
-                21,
                 'Actividad - ' + a.nombre,
                 a.costo_mensual,
                 a.costo_mensual - @descuento_familiar_por_actividad
@@ -1589,9 +1656,9 @@ begin
         if @descuento_familiar > 0
         begin
             insert into socio.item_factura_cuota (
-                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+                id_factura_cuota, cantidad, precio_unitario, tipo_item, subtotal, importe_total
             ) values (
-                @id_factura_cuota, 1, -@descuento_familiar, 21, 'Descuento Familiar (15%)', 
+                @id_factura_cuota, 1, -@descuento_familiar, 'Descuento Familiar (15%)', 
                 -@descuento_familiar, -@descuento_familiar
             );
         end
@@ -1599,9 +1666,9 @@ begin
         if @descuento_actividades > 0
         begin
             insert into socio.item_factura_cuota (
-                id_factura_cuota, cantidad, precio_unitario, alicuota_iva, tipo_item, subtotal, importe_total
+                id_factura_cuota, cantidad, precio_unitario, tipo_item, subtotal, importe_total
             ) values (
-                @id_factura_cuota, 1, -@descuento_actividades, 21, 'Descuento Múltiples Actividades (10%)', 
+                @id_factura_cuota, 1, -@descuento_actividades, 'Descuento Múltiples Actividades (10%)', 
                 -@descuento_actividades, -@descuento_actividades
             );
         end
