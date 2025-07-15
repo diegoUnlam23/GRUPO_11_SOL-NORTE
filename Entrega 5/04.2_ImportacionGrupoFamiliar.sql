@@ -164,7 +164,8 @@ BEGIN
                 @id_tutor = NULL,
                 @id_grupo_familiar = @id_grupo_familiar,
                 @responsable_pago = 0,
-                @estado = 'Activo';
+                @estado = 'Activo',
+                @importacion = 1;
         END
         
         SET @current_row = @current_row + 1;

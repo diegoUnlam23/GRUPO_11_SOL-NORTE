@@ -135,8 +135,8 @@ BEGIN
             SELECT @costo = costo_mensual FROM socio.categoria WHERE id = @id_categoria;
 
             -- Insertar cuota
-            INSERT INTO socio.cuota(id_socio, id_categoria, mes, anio, monto_total)
-            VALUES(@id_socio, @id_categoria, @mes, @anio, @costo);
+            INSERT INTO socio.cuota(id_socio, mes, anio, monto_total)
+            VALUES(@id_socio, @mes, @anio, @costo);
             SET @id_cuota = SCOPE_IDENTITY();
         END
 
@@ -154,19 +154,19 @@ BEGIN
 
         -- Buscar o crear factura
         SET @id_factura = NULL;
-        SELECT @id_factura = id FROM socio.factura_cuota
-        WHERE id_cuota = @id_cuota;
+        SELECT @id_factura = id_factura FROM socio.cuota
+        WHERE id = @id_cuota;
 
         IF @id_factura IS NULL
         BEGIN
             -- Insertar factura
             INSERT INTO socio.factura_cuota(
                 numero_comprobante, tipo_comprobante, fecha_emision, periodo_facturado, iva,    
-                fecha_vencimiento_1, fecha_vencimiento_2, importe_total, descripcion, id_cuota
+                fecha_vencimiento_1, fecha_vencimiento_2, importe_total, descripcion
             )
             VALUES(
                 @numero_comprobante, @tipo_comprobante, @fecha, @periodo_facturado, @iva,
-                @fecha_vencimiento_1, @fecha_vencimiento_2, @valor, @descripcion, @id_cuota
+                @fecha_vencimiento_1, @fecha_vencimiento_2, @valor, @descripcion
             );
             SET @id_factura = SCOPE_IDENTITY();
         END

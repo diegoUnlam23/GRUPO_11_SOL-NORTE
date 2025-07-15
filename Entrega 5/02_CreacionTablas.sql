@@ -94,16 +94,41 @@ create table socio.categoria
 );
 go
 
+create table socio.inscripcion_categoria
+(
+	id					int primary key identity(1,1),
+	id_categoria		int NOT NULL,
+	id_socio			int NOT NULL,
+	foreign key (id_categoria) references socio.categoria(id),
+	foreign key (id_socio) references socio.socio(id)
+);
+go
+
+create table socio.factura_cuota
+(
+	id						int primary key identity(1,1),
+    numero_comprobante      int NOT NULL,
+    tipo_comprobante        varchar(2) NOT NULL,
+	fecha_emision   		date NOT NULL,
+    periodo_facturado       int NOT NULL,
+    iva                     varchar(50) NOT NULL,
+	fecha_vencimiento_1		date NOT NULL,
+	fecha_vencimiento_2		date NOT NULL,
+	importe_total			decimal(12,2),
+	descripcion 			varchar(100) NOT NULL
+);
+go
+
 create table socio.cuota
 (
 	id					int primary key identity(1,1),
 	id_socio			int NOT NULL,
-	id_categoria		int NOT NULL,
-	monto_total			decimal(12,2),
-	anio				int NOT NULL,
 	mes					int NOT NULL,
+	anio				int NOT NULL,
+	monto_total			decimal(12,2),
+	id_factura			int,
 	foreign key (id_socio) references socio.socio(id),
-	foreign key (id_categoria) references socio.categoria(id),
+	foreign key (id_factura) references socio.factura_cuota(id),
 	constraint UQ_cuota_socio_cat_periodo UNIQUE (id_socio, anio, mes)
 );
 go
@@ -161,10 +186,13 @@ go
 create table socio.inscripcion_actividad
 (
 	id					int primary key identity(1,1),
-	id_cuota			int NOT NULL,
 	id_actividad		int NOT NULL,
-	foreign key (id_cuota) references socio.cuota(id),
-	foreign key (id_actividad) references general.actividad(id)
+	id_socio			int NOT NULL,
+	fecha_alta			date NOT NULL,
+	fecha_baja			date,
+	activa				bit NOT NULL,
+	foreign key (id_actividad) references general.actividad(id),
+	foreign key (id_socio) references socio.socio(id)
 );
 go
 
@@ -203,23 +231,6 @@ create table socio.estado_cuenta
 	saldo			decimal(12,2) NOT NULL,
 	foreign key (id_socio) references socio.socio(id),
 	foreign key (id_tutor) references socio.tutor(id)
-);
-go
-
-create table socio.factura_cuota
-(
-	id						int primary key identity(1,1),
-    numero_comprobante      int NOT NULL,
-    tipo_comprobante        varchar(2) NOT NULL,
-	fecha_emision   		date NOT NULL,
-    periodo_facturado       int NOT NULL,
-    iva                     varchar(50) NOT NULL,
-	fecha_vencimiento_1		date NOT NULL,
-	fecha_vencimiento_2		date NOT NULL,
-	importe_total			decimal(12,2),
-	descripcion 			varchar(100) NOT NULL,
-	id_cuota				int,
-	foreign key (id_cuota) references socio.cuota(id)
 );
 go
 

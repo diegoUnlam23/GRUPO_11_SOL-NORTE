@@ -178,111 +178,80 @@ GO
 create or alter procedure socio.altaFacturaImportacion
 as
 begin
-	set nocount on;
+    set nocount on;
 
-	-- 1. Agrupar actividades por socio, año, mes
-	if object_id('tempdb..#actividades_mes') is not null drop table #actividades_mes;
+	-- Actividades realizadas por socios
+	if object_id('tempdb..#actividades_por_socio') is not null drop table #actividades_por_socio;
 	select
 		p.id_socio,
-		YEAR(p.fecha) as anio,
-		MONTH(p.fecha) as mes,
-		min(c.id) as id_categoria, -- suponemos que la categoria es la de la primer clase del mes
+		s.nro_socio,
+		p.id_clase,
+		month(p.fecha) as mes,
+		year(p.fecha) as anio,
 		a.id as id_actividad
-	into #actividades_mes
+	into #actividades_por_socio
 	from general.presentismo p
-	inner join general.clase cl on p.id_clase = cl.id
-	inner join general.actividad a on cl.id_actividad = a.id
-	inner join socio.categoria c on cl.id_categoria = c.id
-	group by p.id_socio, YEAR(p.fecha), MONTH(p.fecha), a.id;
+	join socio.socio s on s.id = p.id_socio
+	join general.clase c on c.id = p.id_clase
+	join general.actividad a on a.id = c.id_actividad;
 
-	-- 2. Crear cuotas si no existen
-	if object_id('tempdb..#cuotas_a_crear') is not null drop table #cuotas_a_crear;
-	select distinct id_socio, id_categoria, anio, mes
-	into #cuotas_a_crear
-	from #actividades_mes am
-	where not exists (
-		select 1 from socio.cuota c
-		where c.id_socio = am.id_socio and c.id_categoria = am.id_categoria and c.anio = am.anio and c.mes = am.mes
-	);
-
-	insert into socio.cuota (id_socio, id_categoria, anio, mes, monto_total)
-	select id_socio, id_categoria, anio, mes, 0
-	from #cuotas_a_crear;
-
-	-- 3. Obtener todas las cuotas a procesar (nuevas y existentes)
-	if object_id('tempdb..#cuotas_mes') is not null drop table #cuotas_mes;
-	select c.id as id_cuota, c.id_socio, c.id_categoria, c.anio, c.mes, procesado = 0
-	into #cuotas_mes
-	from socio.cuota c
-	inner join (
-		select distinct id_socio, anio, mes from #actividades_mes
-	) am on c.id_socio = am.id_socio and c.anio = am.anio and c.mes = am.mes;
-
-	-- 4. Insertar inscripciones a actividades (si no existen)
-	insert into socio.inscripcion_actividad (id_cuota, id_actividad)
-	select cm.id_cuota, am.id_actividad
-	from #cuotas_mes cm
-	inner join #actividades_mes am
-		on cm.id_socio = am.id_socio and cm.anio = am.anio and cm.mes = am.mes
+	-- Agrupa por socio y actividad, usando la menor fecha como fecha_alta
+	with inscripciones_unicas as (
+		select
+			aps.id_actividad,
+			aps.id_socio,
+			min(DATEFROMPARTS(aps.anio, aps.mes, 1)) as fecha_alta
+		from #actividades_por_socio aps
+		group by aps.id_actividad, aps.id_socio
+	)
+	insert into socio.inscripcion_actividad (id_actividad, id_socio, fecha_alta, activa)
+	select iu.id_actividad, iu.id_socio, iu.fecha_alta, 1
+	from inscripciones_unicas iu
 	left join socio.inscripcion_actividad ia
-		on ia.id_cuota = cm.id_cuota and ia.id_actividad = am.id_actividad
+	  on ia.id_actividad = iu.id_actividad
+	  and ia.id_socio = iu.id_socio
 	where ia.id is null;
 
-	-- 5. Calcular y actualizar el monto_total de la cuota
-	update c
-	set monto_total = isnull(cat.costo_mensual,0) + isnull(act.total_actividades,0)
-	from socio.cuota c
-	inner join socio.categoria cat on c.id_categoria = cat.id
-	left join (
-		select ia.id_cuota, sum(a.costo_mensual) as total_actividades
-		from socio.inscripcion_actividad ia
-		inner join general.actividad a on ia.id_actividad = a.id
-		group by ia.id_cuota
-	) act on c.id = act.id_cuota
-	where exists (
-		select 1 from #cuotas_mes cm where cm.id_cuota = c.id
-	);
+	-- Crear cuotas para cada socio, mes y año detectado en actividades
+    if object_id('tempdb..#cuotas_a_crear') is not null drop table #cuotas_a_crear;
+    select distinct
+        aps.id_socio,
+        aps.mes,
+        aps.anio
+    into #cuotas_a_crear
+    from #actividades_por_socio aps
+    where not exists (
+        select 1 from socio.cuota c
+        where c.id_socio = aps.id_socio and c.mes = aps.mes and c.anio = aps.anio
+    );
 
-	-- 6. Llamar a altaFacturaCuota para cada cuota generada
-	update #cuotas_mes set procesado = 0 where procesado is null;
+    declare @id_socio int, @mes int, @anio int;
+    while exists (select 1 from #cuotas_a_crear)
+    begin
+        select top 1 @id_socio = id_socio, @mes = mes, @anio = anio from #cuotas_a_crear;
+        exec socio.altaCuota @id_socio = @id_socio, @mes = @mes, @anio = @anio;
+        delete from #cuotas_a_crear where id_socio = @id_socio and mes = @mes and anio = @anio;
+    end
 
-	declare @id_cuota int, @anio int, @mes int, @fecha_emision date;
+	-- Generar facturas para cada cuota creada si no tiene factura
+    if object_id('tempdb..#cuotas_generadas') is not null drop table #cuotas_generadas;
+    select c.id as id_cuota, c.id_socio, c.anio, c.mes
+    into #cuotas_generadas
+    from socio.cuota c
+    left join #actividades_por_socio aps on c.id_socio = aps.id_socio and c.mes = aps.mes and c.anio = aps.anio
+	join socio.socio s on s.id = c.id_socio;
+	--where s.responsable_pago = 1;
 
-	while exists (select 1 from #cuotas_mes where procesado = 0)
-	begin
-		select top 1 @id_cuota = id_cuota, @anio = anio, @mes = mes
-		from #cuotas_mes
-		where procesado = 0;
+    declare @id_cuota int, @anio_fact int, @mes_fact int, @fecha_emision date;
+    while exists (select 1 from #cuotas_generadas where id_cuota not in (select id from socio.cuota where id_factura is not null))
+    begin
+        select top 1 @id_cuota = id_cuota, @anio_fact = anio, @mes_fact = mes from #cuotas_generadas where id_cuota not in (select id from socio.cuota where id_factura is not null);
+        set @fecha_emision = datefromparts(@anio_fact, @mes_fact, 1);
+        exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
+        delete from #cuotas_generadas where id_cuota = @id_cuota;
+    end
 
-		set @fecha_emision = datefromparts(@anio, @mes, 1);
+	
 
-		exec socio.altaFacturaCuota @id_cuota = @id_cuota, @fecha_emision = @fecha_emision;
-
-		update #cuotas_mes set procesado = 1 where id_cuota = @id_cuota;
-
-
-		-- COMENTAR ESTO EN CASO DE NO QUERER GENERAR PAGOS
-		-- En caso de que pidan hacer de cuenta que fueron pagas, generamos los pagos.
-		-- Obtenemos el monto de la cuota
-		declare @monto_cuota decimal(12,2);
-		select @monto_cuota = monto_total from socio.cuota where id = @id_cuota;
-
-		-- Obtenemos el id de la factura de la cuota
-		declare @id_factura_cuota int;
-		select @id_factura_cuota = id from socio.factura_cuota where id_cuota = @id_cuota;
-
-		-- Generamos el pago
-		exec socio.altaPago
-			@fecha_pago = @fecha_emision,
-			@monto = @monto_cuota,
-			@medio_de_pago = 'Visa',
-			@es_debito_automatico = 0,
-			@id_factura_cuota = @id_factura_cuota;
-	end
-
-	-- Eliminar tablas temporales
-	drop table #actividades_mes;
-	drop table #cuotas_a_crear;
-	drop table #cuotas_mes;
 end
-GO 
+GO

@@ -148,7 +148,8 @@ BEGIN
             @id_tutor = NULL,
             @id_grupo_familiar = NULL,
             @responsable_pago = 1,
-            @estado = 'Activo';
+            @estado = 'Activo',
+            @importacion = 1;
         
         -- Pasar a la siguiente fila
         SET @current_row = @current_row + 1;
